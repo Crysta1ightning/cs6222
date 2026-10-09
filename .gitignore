@@ -1,0 +1,25 @@
+# Local Python environment and caches
+/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Separate upstream checkout; version is recorded in sglang-commit.txt
+/sglang/
+
+# Generated experiment data and logs (retained locally)
+/results/
+*.log
+*.nsys-rep
+*.qdrep
+*.ncu-rep
+
+# Compiled benchmark; keep its source and build script
+/memory-experiment/stream
+
+# Local credentials
+.env
+.env.*
+!.env.example
