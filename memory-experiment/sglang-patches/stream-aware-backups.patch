@@ -1,0 +1,524 @@
+diff --git a/python/sglang/srt/managers/cache_controller.py b/python/sglang/srt/managers/cache_controller.py
+index 115720b06f..ba136d29a7 100644
+--- a/python/sglang/srt/managers/cache_controller.py
++++ b/python/sglang/srt/managers/cache_controller.py
+@@ -819,10 +819,25 @@ class HiCacheController:
+         self.start_writing()
+         return host_indices
+ 
+-    def start_writing(self) -> None:
++    def start_writing(self, force_reason: Optional[str] = None) -> None:
+         if len(self.write_queue) == 0:
+             return
+ 
++        activity = getattr(self, "stream_activity", None)
++        reason = force_reason or "normal"
++        if activity is not None:
++            activity.observe_pending(
++                sum(len(op.device_indices) for op in self.write_queue),
++                sum(self._transfer_num_bytes(op) for op in self.write_queue),
++                len(self.write_queue),
++            )
++            reason = activity.flush_reason(
++                free_tokens=self.activity_free_tokens(),
++                reserve_tokens=self.activity_reserve_tokens, force=force_reason,
++            )
++            if reason is None:
++                return
++
+         op = CacheOperation.merge_ops(self.write_queue)
+         host_indices, device_indices, pool_transfers = self._move_write_operation(op)
+         self.write_queue.clear()
+@@ -842,6 +857,8 @@ class HiCacheController:
+                 num_bytes=self._transfer_num_bytes(op),
+             )
+         )
++        if activity is not None:
++            activity.submitted(self.ack_write_queue[-1].num_bytes, len(op.device_indices), reason)
+ 
+     def _transfer_num_bytes(self, op: CacheOperation) -> int:
+         return len(op.device_indices) * self.mem_pool_host.size_per_token
+diff --git a/python/sglang/srt/mem_cache/stream_activity.py b/python/sglang/srt/mem_cache/stream_activity.py
+new file mode 100644
+index 0000000000..5fa048c042
+--- /dev/null
++++ b/python/sglang/srt/mem_cache/stream_activity.py
+@@ -0,0 +1,266 @@
++"""Experimental single-scheduler tool-activity gate; no bandwidth estimation.
++
++The UNIX listener runs in the *scheduler* process. Its thread changes only
++lease state under a lock; cache decisions and CUDA submissions stay on the
++scheduler thread. Deferred transfers use the existing write queue and locks.
++"""
++
++import json
++import math
++import os
++import socket
++import subprocess
++import threading
++import time
++from collections import Counter, OrderedDict, deque
++from pathlib import Path
++
++MAX_FRAME = 1024 * 1024
++
++
++class ActivityController:
++    def __init__(self, mode, *, max_tokens=4096, max_ops=256, max_age=2.0,
++                 lease=15.0, max_tools=128, log_path=None, clock=time.monotonic):
++        if mode not in ("normal", "defer", "skip"):
++            raise ValueError("controller mode must be normal, defer, or skip")
++        if min(max_tokens, max_ops, max_tools) < 1 or not all(
++            math.isfinite(v) and v > 0 for v in (max_age, lease)
++        ):
++            raise ValueError("controller bounds must be positive and finite")
++        self.mode, self.max_tokens, self.max_ops = mode, max_tokens, max_ops
++        self.max_age, self.lease, self.max_tools = max_age, lease, max_tools
++        self.clock = clock
++        self.lock = threading.RLock()
++        self.active = {}
++        self.ended = OrderedDict()
++        self.counters = Counter(dict.fromkeys((
++            "submitted_batches", "submitted_bytes", "completed_batches", "completed_bytes",
++            "skipped_opportunities", "skipped_tokens", "deferred_decisions", "pressure_overrides",
++            "peak_pending_tokens", "peak_pending_bytes", "TOOL_END", "TOOL_EXPIRED",
++        ), 0))
++        self.events = deque(maxlen=4096)
++        self.sequence = 0
++        self.pending_tokens = self.pending_bytes = self.pending_ops = 0
++        self.pending_since = None
++        self.log_path = str(log_path) if log_path else None
++        self.log = open(log_path, "a", buffering=1) if log_path else None
++        try:
++            numa = subprocess.run(["numactl", "--show"], capture_output=True, text=True, timeout=2)
++            self.placement = dict(cpu_affinity=sorted(os.sched_getaffinity(0)), numa=numa.stdout,
++                                  numa_error=numa.stderr, numa_returncode=numa.returncode)
++        except (OSError, subprocess.TimeoutExpired) as exc:
++            self.placement = dict(cpu_affinity=sorted(os.sched_getaffinity(0)), numa_error=str(exc))
++        self.listener = None
++        self.stop = threading.Event()
++        self.emit("CONTROLLER_START", mode=mode, pid=os.getpid(),
++                  hostname=socket.gethostname(), job_id=os.getenv("SLURM_JOB_ID"))
++
++    def emit(self, event, **fields):
++        with self.lock:
++            self.sequence += 1
++            item = dict(sequence=self.sequence, event=event,
++                        monotonic_ns=time.monotonic_ns(), unix_ns=time.time_ns(), **fields)
++            self.events.append(item)
++            if self.log:
++                self.log.write(json.dumps(item) + "\n")
++            return item
++
++    def _end(self, tool_id, reason):
++        self.active.pop(tool_id, None)
++        self.ended[tool_id] = None
++        while len(self.ended) > 1024:
++            self.ended.popitem(last=False)
++        self.counters[reason] += 1
++        self.emit(reason, tool_id=tool_id, active_tools=len(self.active))
++
++    def _expire(self):
++        now = self.clock()
++        for tool_id, deadline in list(self.active.items()):
++            if deadline <= now:
++                self._end(tool_id, "TOOL_EXPIRED")
++
++    def handle(self, request):
++        with self.lock:
++            if not isinstance(request, dict):
++                raise ValueError("control request must be a JSON object")
++            request_id = request.get("request_id")
++            if request_id is not None and (not isinstance(request_id, str) or len(request_id) > 128):
++                raise ValueError("invalid request_id")
++            self._expire()
++            event = request.get("event")
++            tool_id = request.get("tool_id")
++            if event in ("TOOL_START", "TOOL_END", "TOOL_HEARTBEAT"):
++                if not isinstance(tool_id, str) or not 1 <= len(tool_id) <= 128:
++                    raise ValueError("tool_id must be a nonempty string of at most 128 characters")
++            if event == "TOOL_START":
++                if tool_id in self.ended:
++                    raise ValueError("tool ID has ended/expired; use a new ID")
++                if tool_id not in self.active:
++                    if len(self.active) >= self.max_tools:
++                        raise ValueError("active tool limit reached")
++                    self.active[tool_id] = self.clock() + self.lease
++                    self.emit(event, tool_id=tool_id, request_id=request.get("request_id"),
++                              client_monotonic_ns=request.get("client_monotonic_ns"),
++                              warmup=bool(request.get("warmup")), active_tools=len(self.active))
++            elif event == "TOOL_HEARTBEAT":
++                if tool_id not in self.active:
++                    raise ValueError("tool lease not active")
++                self.active[tool_id] = self.clock() + self.lease
++            elif event == "TOOL_END":
++                if tool_id in self.active:
++                    self._end(tool_id, "TOOL_END")
++            elif event != "STATUS":
++                raise ValueError("unknown tool-activity event")
++            snapshot = self.snapshot(request.get("since", self.sequence))
++            snapshot.update(ok=True, request_id=request.get("request_id"),
++                            ack_monotonic_ns=time.monotonic_ns())
++            return snapshot
++
++    def snapshot(self, since=None):
++        with self.lock:
++            self._expire()
++            since = self.sequence if since is None else int(since)
++            events = [item for item in self.events if item["sequence"] > since][:256]
++            oldest = self.events[0]["sequence"] if self.events else self.sequence + 1
++            return dict(mode=self.mode, pid=os.getpid(), signal="tool_activity",
++                        scheduler_placement=self.placement,
++                        sequence=self.sequence, events=events,
++                        events_truncated=since < oldest - 1,
++                        active_tool_ids=sorted(self.active), lease_seconds=self.lease,
++                        max_pending_tokens=self.max_tokens, max_pending_ops=self.max_ops,
++                        max_defer_seconds=self.max_age,
++                        pending_tokens=self.pending_tokens, pending_bytes=self.pending_bytes,
++                        pending_ops=self.pending_ops, counters=dict(self.counters),
++                        in_flight_batches=self.counters["submitted_batches"] - self.counters["completed_batches"],
++                        log_path=self.log_path)
++
++    def allow_optional(self, tokens):
++        with self.lock:
++            self._expire()
++            if self.active and self.mode == "skip":
++                self.counters["skipped_opportunities"] += 1
++                self.counters["skipped_tokens"] += tokens
++                self.emit("BACKUP_SKIPPED", tokens=tokens)
++                return False
++            return True
++
++    def observe_pending(self, tokens, num_bytes, ops):
++        with self.lock:
++            changed = (tokens, num_bytes, ops) != (self.pending_tokens, self.pending_bytes, self.pending_ops)
++            if tokens and self.pending_since is None:
++                self.pending_since = self.clock()
++            if not ops:
++                self.pending_since = None
++            self.pending_tokens, self.pending_bytes, self.pending_ops = tokens, num_bytes, ops
++            self.counters["peak_pending_tokens"] = max(self.counters["peak_pending_tokens"], tokens)
++            self.counters["peak_pending_bytes"] = max(self.counters["peak_pending_bytes"], num_bytes)
++            if changed:
++                self.emit("BACKUP_PENDING", tokens=tokens, bytes=num_bytes, ops=ops)
++
++    def flush_reason(self, *, free_tokens, reserve_tokens, force=None):
++        with self.lock:
++            self._expire()
++            if not self.pending_ops:
++                return None
++            if force:
++                reason = force
++            elif self.mode != "defer" or not self.active:
++                return "normal"
++            elif self.pending_tokens >= self.max_tokens or self.pending_ops >= self.max_ops:
++                reason = "pending_limit"
++            elif free_tokens < reserve_tokens:
++                reason = "gpu_pressure"
++            elif self.clock() - self.pending_since >= self.max_age:
++                reason = "maximum_age"
++            else:
++                self.counters["deferred_decisions"] += 1
++                # Log the decision once per queue, not on every idle scheduler tick.
++                if not self.events or self.events[-1]["event"] != "BACKUP_DEFERRED":
++                    self.emit("BACKUP_DEFERRED", tokens=self.pending_tokens, bytes=self.pending_bytes)
++                return None
++            if self.active:
++                self.counters["pressure_overrides"] += 1
++                self.emit("BACKUP_OVERRIDE", reason=reason, tokens=self.pending_tokens,
++                          bytes=self.pending_bytes)
++            return reason
++
++    def required_override(self, reason, tokens, num_bytes):
++        with self.lock:
++            self._expire()
++            if self.active:
++                self.counters["pressure_overrides"] += 1
++                self.emit("BACKUP_OVERRIDE", reason=reason, tokens=tokens, bytes=num_bytes)
++
++    def submitted(self, num_bytes, tokens, reason, clear_pending=True):
++        with self.lock:
++            self.counters["submitted_batches"] += 1
++            self.counters["submitted_bytes"] += num_bytes
++            self.emit("BACKUP_SUBMITTED", bytes=num_bytes, tokens=tokens, reason=reason)
++            if clear_pending:
++                self.observe_pending(0, 0, 0)
++
++    def completed(self, ack):
++        with self.lock:
++            self.counters["completed_batches"] += 1
++            self.counters["completed_bytes"] += ack.num_bytes
++            duration = (ack.start_event.elapsed_time(ack.finish_event)
++                        if getattr(ack, "timing_enabled", False) else None)
++            self.emit("BACKUP_COMPLETED", bytes=ack.num_bytes, tokens=ack.num_tokens,
++                      cuda_copy_ms=duration)
++
++    def serve(self, path):
++        path = Path(path)
++        if path.exists():
++            raise ValueError(f"control socket already exists: {path}; do not overwrite a live server")
++        self.socket_path = path
++        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
++        try:
++            listener.bind(str(path))
++        except BaseException:
++            listener.close()
++            raise
++        os.chmod(path, 0o600)
++        self.socket_inode = path.stat().st_ino
++        listener.listen(8)
++        listener.settimeout(0.2)
++        self.listener = listener
++        self.thread = threading.Thread(target=self._listen, daemon=True)
++        self.thread.start()
++
++    def _listen(self):
++        while not self.stop.is_set():
++            try:
++                connection, _ = self.listener.accept()
++            except socket.timeout:
++                with self.lock:
++                    self._expire()
++                continue
++            except OSError:
++                break
++            with connection:
++                connection.settimeout(0.5)
++                try:
++                    with connection.makefile("rb") as reader:
++                        frame = reader.readline(MAX_FRAME + 1)
++                    if len(frame) > MAX_FRAME or not frame.endswith(b"\n"):
++                        raise ValueError("invalid/oversized control frame")
++                    response = self.handle(json.loads(frame))
++                except (ValueError, TypeError, OSError) as exc:
++                    response = dict(ok=False, error=str(exc))
++                try:
++                    connection.sendall(json.dumps(response).encode() + b"\n")
++                except OSError:
++                    pass  # An unacknowledged start expires unless its client renews.
++
++    def close(self):
++        self.stop.set()
++        if self.listener:
++            self.listener.close()
++            self.thread.join(timeout=1)
++            if self.socket_path.exists() and self.socket_path.stat().st_ino == self.socket_inode:
++                self.socket_path.unlink()
++            self.listener = None
++        with self.lock:
++            if self.log:
++                self.log.close()
++                self.log = None
+diff --git a/python/sglang/srt/mem_cache/unified_radix_cache.py b/python/sglang/srt/mem_cache/unified_radix_cache.py
+index 421a215722..4874179d5d 100644
+--- a/python/sglang/srt/mem_cache/unified_radix_cache.py
++++ b/python/sglang/srt/mem_cache/unified_radix_cache.py
+@@ -2,6 +2,7 @@ from __future__ import annotations
+ 
+ import atexit
+ import logging
++import os
+ import threading
+ import time
+ from dataclasses import replace
+@@ -12,7 +13,7 @@ import torch
+ 
+ from sglang.srt.distributed.communication_tags import P2PTag
+ from sglang.srt.environ import envs
+-from sglang.srt.managers.cache_controller import CacheOperation
++from sglang.srt.managers.cache_controller import CacheOperation, HiCacheAck
+ from sglang.srt.mem_cache.allocator.page_interleave import (
+     page_interleave_shard_size,
+ )
+@@ -92,7 +93,7 @@ from sglang.srt.observability.metrics_collector import (
+     StorageMetrics,
+     StorageMetricsCollector,
+ )
+-from sglang.srt.runtime_context import get_memory, get_model, get_observability
++from sglang.srt.runtime_context import get_disagg, get_memory, get_model, get_observability, get_parallel
+ from sglang.srt.session.streaming_session import StreamingSession
+ from sglang.srt.utils.common import ceil_align
+ 
+@@ -163,6 +164,8 @@ class _OngoingPrefetch(NamedTuple):
+ 
+ 
+ class UnifiedRadixCache(BasePrefixCache):
++    stream_activity = None
++
+     def __init__(
+         self,
+         params: CacheInitParams,
+@@ -278,6 +281,7 @@ class UnifiedRadixCache(BasePrefixCache):
+         # constructs the pipeline collaborator (None = cache mode).
+         self.host_memory_mode = "cache"
+         self.buffer_pipeline: Optional[BufferModePipeline] = None
++        self.stream_activity = None
+         # Write-side dedupe: beliefs about what storage already holds, so
+         # re-inserts of hot prefixes skip the redundant backup.
+         self.storage_existence_cache = StorageExistenceCache()
+@@ -366,6 +370,11 @@ class UnifiedRadixCache(BasePrefixCache):
+         self.linker = UnifiedCacheLinkerWrapper(self, cache_linker)
+ 
+     def reset(self) -> None:
++        if self.stream_activity is not None and self.cache_controller is not None:
++            # Drain protected/in-flight writes before destroying the arena and
++            # host allocation metadata. Never replay references after a reset.
++            self.cache_controller.start_writing(force_reason="cache_reset")
++            self.writing_check(write_back=True)
+         if self.linker is not None:
+             self.linker.reset()
+         self._reset_full()
+@@ -398,6 +407,9 @@ class UnifiedRadixCache(BasePrefixCache):
+             self.cache_controller.reset()
+             self.cache_controller.mem_pool_host.clear()
+             self.enable_storage = self.cache_controller.enable_storage
++        if self.stream_activity is not None:
++            self.stream_activity.observe_pending(0, 0, 0)
++            self.stream_activity.emit("CACHE_RESET")
+ 
+         self.tree_core.kv_events.record_all_cleared()
+ 
+@@ -513,6 +525,33 @@ class UnifiedRadixCache(BasePrefixCache):
+                     pool=PoolName.KV.value,
+                 )
+         self.load_back_threshold = 10
++        control_socket = os.getenv("SGLANG_STREAM_CONTROL_SOCKET")
++        if control_socket:
++            # Fail closed on stacks whose component/collective semantics have
++            # not been validated for this local, single-scheduler controller.
++            if (self.tp_world_size != 1 or self.pp_size != 1
++                    or get_parallel().tp_size != 1 or get_parallel().dp_size != 1 or get_parallel().dcp_size != 1
++                    or get_disagg().disaggregation_mode not in (None, "null")
++                    or set(self.tree_components) != {ComponentType.FULL}
++                    or self.host_memory_mode != "cache" or self.cache_controller is None
++                    or self.sidecar_pool_specs or storage_backend is not None
++                    or get_memory().hicache_write_policy != "write_through"):
++                raise ValueError("STREAM controller requires single-TP/PP FULL-only HiCache, write_through, no sidecars or L3")
++            from sglang.srt.mem_cache.stream_activity import ActivityController
++
++            capacity = self.token_to_kv_pool_allocator.size_full
++            self.stream_activity = ActivityController(
++                os.getenv("SGLANG_STREAM_CONTROLLER_MODE", "normal"),
++                max_tokens=min(int(os.getenv("SGLANG_STREAM_MAX_PENDING_TOKENS", "4096")), max(1, capacity // 2)),
++                max_ops=int(os.getenv("SGLANG_STREAM_MAX_PENDING_OPS", "256")),
++                max_age=float(os.getenv("SGLANG_STREAM_MAX_DEFER_SECONDS", "2")),
++                lease=float(os.getenv("SGLANG_STREAM_LEASE_SECONDS", "15")),
++                log_path=os.getenv("SGLANG_STREAM_CONTROLLER_LOG"),
++            )
++            self.stream_activity.serve(control_socket)
++            self.cache_controller.stream_activity = self.stream_activity
++            self.cache_controller.activity_free_tokens = self.token_to_kv_pool_allocator.available_size
++            self.cache_controller.activity_reserve_tokens = max(self.page_size, capacity // 8)
+         self.prefetch_stop_policy = get_memory().hicache_storage_prefetch_policy
+ 
+         # Runtime attach/detach of the L3 backend (startup, admin API, atexit).
+@@ -611,6 +650,12 @@ class UnifiedRadixCache(BasePrefixCache):
+         """
+         if self.disable:
+             return EvictResult()
++        if (self.stream_activity is not None and self.stream_activity.mode == "defer"
++                and self.cache_controller.write_queue):
++            # Existing queued backups own GPU locks. Complete them before
++            # selecting allocation victims, preserving reclaimable capacity.
++            self.cache_controller.start_writing(force_reason="allocation_critical")
++            self.writing_check(write_back=True)
+ 
+         request_by_type = self._evict_request_by_type(params)
+         available_size_targets = {
+@@ -705,6 +750,10 @@ class UnifiedRadixCache(BasePrefixCache):
+     ) -> EvictResult:
+         if self.disable:
+             return EvictResult()
++        if (self.stream_activity is not None and self.stream_activity.mode == "defer"
++                and self.cache_controller.write_queue):
++            self.cache_controller.start_writing(force_reason="allocation_critical")
++            self.writing_check(write_back=True)
+         start_time = time.perf_counter()
+         tracker = {ct: 0 for ct in self.tree_components}
+ 
+@@ -1513,12 +1562,24 @@ class UnifiedRadixCache(BasePrefixCache):
+             write_host, write_device, write_pools = (
+                 self.cache_controller._move_write_operation(operation)
+             )
++            if self.stream_activity is not None:
++                self.stream_activity.required_override("required_retraction", len(device_indices),
++                    self.cache_controller._transfer_num_bytes(operation))
+             completion = self.cache_controller.l2_transfer_engine.submit_device_to_host(
+                 self.cache_controller._l2_transfers(
+                     write_host, write_device, write_pools
+                 )
+             )
++            if self.stream_activity is not None:
++                self.stream_activity.submitted(self.cache_controller._transfer_num_bytes(operation),
++                    len(device_indices), "required_retraction", clear_pending=False)
+             completion.finish_event.synchronize()
++            if self.stream_activity is not None:
++                self._log_write_ack_metrics(HiCacheAck(
++                    start_event=completion.start_event, finish_event=completion.finish_event,
++                    node_ids=[-1], num_tokens=len(device_indices),
++                    num_bytes=self.cache_controller._transfer_num_bytes(operation),
++                    timing_enabled=completion.timing_enabled))
+         except Exception:
+             self.discard_kv_cache_backup(backup)
+             raise
+@@ -1614,6 +1675,14 @@ class UnifiedRadixCache(BasePrefixCache):
+             # backed up. Skip only when no transfer remains.
+             if device_value.numel() == 0 and not comp_xfers:
+                 continue
++            activity = self.stream_activity
++            if activity is not None and not write_back:
++                if not activity.allow_optional(len(device_value)):
++                    continue
++                queued = self.cache_controller.write_queue
++                if activity.mode == "defer" and queued and (sum(len(op.device_indices) for op in queued) + len(device_value) > activity.max_tokens
++                               or len(queued) >= activity.max_ops):
++                    self.cache_controller.start_writing(force_reason="pending_limit")
+             sidecar_xfers = self._build_backup_sidecar(device_value, comp_xfers)
+             host_indices = self._execute_kv_backup(
+                 node_id, device_value, comp_xfers, sidecar_xfers
+@@ -1628,6 +1697,14 @@ class UnifiedRadixCache(BasePrefixCache):
+             self._track_write_through_node(
+                 node_id, lock_params, publish_node_ids=publish_node_ids
+             )
++            if activity is not None:
++                queued = self.cache_controller.write_queue
++                tokens = sum(len(op.device_indices) for op in queued)
++                activity.observe_pending(tokens, sum(self.cache_controller._transfer_num_bytes(op) for op in queued), len(queued))
++                # A single large node cannot be partially deferred. Submit it
++                # immediately, bounding retained GPU state by one node plus cap.
++                if activity.mode == "defer" and (tokens >= activity.max_tokens or len(queued) >= activity.max_ops):
++                    self.cache_controller.start_writing(force_reason="pending_limit")
+             written = len(host_indices)
+         return written
+ 
+@@ -3204,6 +3281,8 @@ class UnifiedRadixCache(BasePrefixCache):
+         """Best-effort auto-detach of the storage backend on process shutdown."""
+         if self._storage_attachment is not None:
+             self._storage_attachment.shutdown()
++        if self.stream_activity is not None:
++            self.stream_activity.close()
+ 
+     def clear_storage_backend(self) -> bool:
+         if self._storage_attachment is None:
+@@ -3295,7 +3374,10 @@ class UnifiedRadixCache(BasePrefixCache):
+ 
+         if write_back:
+             # Blocking: submit what is still queued, then wait for every ack.
+-            cc.start_writing()
++            if self.stream_activity is None:
++                cc.start_writing()
++            else:
++                cc.start_writing(force_reason="allocation_critical")
+             while self.ongoing_write_through:
+                 for ack in cc.ack_write_queue:
+                     ack.finish_event.synchronize()
+@@ -3330,6 +3412,8 @@ class UnifiedRadixCache(BasePrefixCache):
+ 
+     def _log_write_ack_metrics(self, ack: HiCacheAck) -> None:
+         """Record D->H backup volume and duration for a completed write ack."""
++        if self.stream_activity is not None:
++            self.stream_activity.completed(ack)
+         if self.metrics_collector is None:
+             return
+         for pool, num_tokens in (ack.num_tokens_by_pool or {}).items():

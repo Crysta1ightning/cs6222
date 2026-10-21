@@ -1,58 +1,60 @@
-"""Summarize explicitly selected result files from the three conditions."""
+"""Summarize matched runs without mixing controllers, write policies, or windows."""
 
+import argparse
 import json
 import statistics
-import sys
 from collections import defaultdict
 from pathlib import Path
 
 
+def median(values):
+    available = [v for v in values if v is not None]
+    return statistics.median(available) if available else None
+
+
+def display(value):
+    return f"{value:.3f}" if value is not None else "N/A"
+
+
 def main():
-    if len(sys.argv) < 2:
-        raise SystemExit("Usage: python memory-experiment/summarize.py <result.json> ...")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("results", nargs="+", type=Path)
+    parser.add_argument("--window", choices=("all", "tool", "post_tool", "whole"), default="all")
+    args = parser.parse_args()
     grouped = defaultdict(list)
     configurations = set()
-    for name in sys.argv[1:]:
-        data = json.loads(Path(name).read_text())
+    for path in args.results:
+        data = json.loads(path.read_text())
         if data.get("error"):
-            raise SystemExit(f"Incomplete/failed run: {name}: {data['error']}")
-        configurations.add((data["hostname"], data["threads"], data["binary_sha256"],
-                            tuple(data["cpu_affinity"])))
+            parser.error(f"Incomplete/failed run: {path}: {data['error']}")
+        configurations.add((data["hostname"], data["threads"], data["binary_sha256"], tuple(data["cpu_affinity"]),
+                            data.get("numa", {}).get("stdout")))
+        info = data.get("server_info", {})
+        policy = data.get("write_policy", info.get("server_args", info).get("hicache_write_policy", "none"))
+        controller = data.get("controller_mode", "normal") if data.get("controller_enabled") else "disabled"
+        prefix = (data["mode"], data.get("workload", "stream"), policy, controller)
         for trial in data["trials"]:
-            if trial["warnings"]:
-                print(f"WARNING: {name}, trial {trial['trial']}: {trial['warnings']}")
-            grouped[(data["mode"], data.get("workload", "stream"))].append(trial)
+            for warning in trial.get("warnings", []):
+                print(f"WARNING: {path}, trial {trial['trial']}: {warning}")
+            windows = {"tool": trial, **trial.get("windows", {})}
+            for name, window in windows.items():
+                if args.window not in ("all", name):
+                    continue
+                grouped[(*prefix, name)].append((trial, window))
     if len(configurations) > 1:
-        raise SystemExit("Runs differ in node, thread count, binary, or CPU affinity; compare matched runs.")
-    medians = {}
-    inference_rates = {}
-    print("\nCondition            Trials   Median Triad GB/s   Median backup GB/s   Median requests/s")
-    for mode, workload in (("memory-only", "stream"), ("no-hicache", "stream"),
-                           ("hicache", "stream"), ("no-hicache", "inference-only"),
-                           ("hicache", "inference-only")):
-        trials = grouped[(mode, workload)]
-        if not trials:
-            continue
-        bandwidth = None
-        if workload == "stream":
-            bandwidth = statistics.median(t["kernels"]["Triad"]["average_GB_per_second"] for t in trials)
-            medians[mode] = bandwidth
-        backup = statistics.median(t["backup_payload_GB_per_second"] for t in trials)
-        requests = statistics.median(t["requests_per_second"] for t in trials)
-        inference_rates[(mode, workload)] = requests
-        name = mode if workload == "stream" else mode + " alone"
-        bandwidth_text = f"{bandwidth:.2f}" if bandwidth is not None else "N/A"
-        print(f"{name:20} {len(trials):6} {bandwidth_text:>19} {backup:20.2f} {requests:19.2f}")
-    if "hicache" in medians and "no-hicache" in medians:
-        change = 100 * (medians["hicache"] / medians["no-hicache"] - 1)
-        print(f"\nHiCache vs inference without HiCache: {change:+.1f}% memory bandwidth")
-    print("Lower bandwidth means worse memory-workload performance.")
-    for mode in ("no-hicache", "hicache"):
-        alone = inference_rates.get((mode, "inference-only"))
-        concurrent = inference_rates.get((mode, "stream"))
-        if alone and concurrent is not None:
-            print(f"{mode}: inference throughput change with STREAM: {100 * (concurrent / alone - 1):+.1f}%")
-    print("Compare individual trials and inference rates; this is a synthetic diagnostic, not a real-tool or scheduling result.")
+        parser.error("Runs differ in node, thread count, binary, CPU affinity, or NUMA policy; compare matched runs.")
+    print("mode | workload | write policy | controller | window | trials | Triad GB/s | backup GB/s | requests/s | elapsed s | completed requests")
+    for key, pairs in sorted(grouped.items(), key=lambda item: tuple(str(v) for v in item[0])):
+        mode, workload, policy, controller, name = key
+        triad = median([trial.get("kernels", {}).get("Triad", {}).get("average_GB_per_second")
+                        for trial, _ in pairs]) if name == "tool" else None
+        backup = median([window.get("backup_payload_GB_per_second") for _, window in pairs])
+        inference = median([window.get("requests_per_second") for _, window in pairs]) if mode != "memory-only" else None
+        elapsed = median([window.get("process_seconds") for _, window in pairs])
+        completed = median([window.get("fully_contained_requests") for _, window in pairs]) if mode != "memory-only" else None
+        print(" | ".join(map(str, (*key, len(pairs), display(triad), display(backup), display(inference), display(elapsed), display(completed)))))
+    print("Tool-window gains must be assessed alongside post_tool and whole, which include subsequent inference and deferred draining.")
+    print("Missing metrics are N/A. Fresh prompts are diagnostic and cannot establish KV-reuse or end-to-end agent benefits.")
 
 
 if __name__ == "__main__":
