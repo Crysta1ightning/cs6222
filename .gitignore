@@ -1,5 +1,6 @@
 # Local Python environment and caches
 /.venv/
+/.runtime-archives/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -15,9 +16,14 @@ __pycache__/
 *.nsys-rep
 *.qdrep
 *.ncu-rep
+/presentations/
 
 # Compiled benchmark; keep its source and build script
 /memory-experiment/stream
+/memory-experiment/stream-[0-9]*
+/memory-experiment/stream-worker
+/memory-experiment/build-sha256-*.txt
+/memory-experiment/compiler-version-*.txt
 
 # Local credentials
 .env
