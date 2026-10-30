@@ -41,6 +41,10 @@ the allocation. It uses bounded Slurm commands, a ten-minute queue wait and a
 thirty-minute setup timeout by default;
 adjust `--wait-seconds` or `--setup-timeout` for the user's needs. Run this helper
 with a PTY (`exec_command` with `tty: true`) and yield during allocation/startup.
+On this Codex host, also give `salloc` a controlling terminal by wrapping the
+helper as `script -q -e -c 'python3 /ABSOLUTE/pace-setup/scripts/setup.py OPTIONS' /dev/null`.
+Keep `tty: true` for that wrapper. A tool PTY alone can lack a controlling
+terminal even though an ordinary user login terminal works directly.
 Keep that exec session alive at the ready compute prompt; do not send Ctrl+D or
 terminate it when reporting completion. Subsequent agent commands can use the
 same session. Inspect `request.json`, `allocation.json` and `setup.log` for
