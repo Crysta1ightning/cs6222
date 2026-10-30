@@ -1,17 +1,17 @@
 """Allocate/reuse one PACE GPU node, verify NUMA placement, and save shell exports."""
 import argparse
+import contextlib
 import csv
 import datetime as dt
 import json
+import io
 import os
 from pathlib import Path
 import re
 import shlex
-import signal
 import socket
 import subprocess
 import sys
-import time
 
 from topology import PlacementError, choose, discover, parse_list, pci_path
 
@@ -41,11 +41,11 @@ def job_info(job):
 
 
 def submission(args, output):
-    return ['sbatch','--parsable','--job-name=pace-setup','--partition='+args.partition,
+    return ['salloc','--job-name=pace-setup','--partition='+args.partition,
             '--nodes=1','--ntasks=1','--cpus-per-task='+str(args.cpus),
             '--hint=nomultithread','--gres=gpu:'+args.gpu+':1','--gres-flags=enforce-binding',
             '--mem='+args.memory,'--time='+args.time,'--chdir='+str(args.project),
-            '--output='+str(output/'allocation-%j.log')]
+            '--immediate='+str(args.wait_seconds)]
 
 
 def step_command(job, cpus):
@@ -54,24 +54,8 @@ def step_command(job, cpus):
             '--immediate=30','--kill-on-bad-exit=1']
 
 
-def setup_step(command, log, timeout):
-    process = subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,text=True,start_new_session=True)
-    try:
-        code=process.wait(timeout=timeout)
-        if code:
-            raise subprocess.CalledProcessError(code,command)
-    except BaseException:
-        # TERM lets srun forward cancellation to this step. Do not kill a
-        # reused allocation or leave installation running after a timed-out step.
-        try:
-            os.killpg(process.pid,signal.SIGTERM)
-            process.wait(timeout=10)
-        except ProcessLookupError:
-            pass
-        except subprocess.TimeoutExpired:
-            os.killpg(process.pid,signal.SIGKILL)
-            process.wait(timeout=10)
-        raise
+def terminal_command(job, cpus, output):
+    return step_command(job,cpus)+['--pty','bash','--rcfile',str(output/'session.bashrc'),'-i']
 
 
 def source_guard(values):
@@ -210,7 +194,6 @@ def compute(args, output):
                       completed_utc=dt.datetime.now(dt.timezone.utc).isoformat(),
                       server_started=False,experiments_started=False)
         save(output/'settings.json',report)
-        print(json.dumps(report,indent=2),flush=True)
     except BaseException as exc:
         (output/'env.sh').unlink(missing_ok=True)
         report.update(status='failed',error=str(exc))
@@ -238,91 +221,82 @@ def summary(report, state):
         print('export '+key+'='+shlex.quote(value))
     print('Report: '+str(state.parent/'settings.json'))
     print('No model server or experiments were started.')
+    print('Open another ICE LOGIN terminal and run this exact command:')
+    print(report['second_terminal_command'])
+    print('Keep the original allocation shell open. Exiting it releases a new salloc allocation; exiting a second shell only ends that step.')
     print('For each agent command, use this Slurm step and source env.sh:')
     print(shlex.join(step_command(report['job_id'],int(json.loads(state.read_text())['allocated_step_cpus'])))+
           ' bash -lc '+shlex.quote('source '+shlex.quote(report['environment_file'])+' && YOUR_COMMAND'))
 
 
+def forwarded(args, output):
+    command=[str(HERE/'setup.py'),'--project',str(args.project),'--cpus',str(args.cpus),
+             '--server-cores',str(args.server_cores),'--gpu',args.gpu,'--memory',args.memory,
+             '--time',args.time,'--partition',args.partition,'--output-dir',str(output),
+             '--setup-timeout',str(args.setup_timeout),'--wait-seconds',str(args.wait_seconds)]
+    if args.numa_node is not None:
+        command+=['--numa-node',str(args.numa_node)]
+    if args.allow_remote_numa:
+        command+=['--allow-remote-numa']
+    if args.repair_install:
+        command+=['--repair-install']
+    if args.new_allocation:
+        command+=['--new-allocation']
+    return command
+
+
 def manage(args, output):
-    owned = False
     job = args.job_id or os.environ.get('SLURM_JOB_ID')
-    state = output/'allocation.json'
-    start = time.monotonic()
-    try:
-        if not job:
-            keeper = '#!/bin/bash\n# Allocation persists after setup; Slurm enforces its time limit.\ntrap "exit 0" TERM INT\nwhile :; do sleep 30 & wait $!; done\n'
-            result = run(submission(args,output),input=keeper,timeout=60)
-            job = result.split(';')[0].strip()
-            if not job.isdigit():
-                raise RuntimeError(f'Unexpected sbatch response: {result}')
-            owned = True
-        args.job_id = str(job)
-        allocation = dict(job_id=str(job),created_by_setup=owned,requested=requested(args),status='waiting')
-        save(state,allocation)
-        print(f'Job {job}; setup state: {state}',flush=True)
-        previous = None
-        while True:
-            fields, raw = job_info(job)
-            condition = fields.get('JobState','UNKNOWN')
-            description = condition+': '+fields.get('Reason','unknown')
-            if previous != description:
-                print(description,flush=True);previous=description
-            if condition=='RUNNING':
-                break
-            if condition not in ('PENDING','CONFIGURING'):
-                raise RuntimeError(f'Allocation is not runnable: {raw}')
-            if time.monotonic()-start>=args.wait_seconds:
-                raise TimeoutError(f'Queue wait exceeded {args.wait_seconds}s: {description}')
-            time.sleep(min(10,max(0.1,args.wait_seconds-(time.monotonic()-start))))
-        cpus = int(fields['NumCPUs'])
-        if cpus < args.cpus:
-            raise RuntimeError(f'Existing allocation has {cpus} CPUs; requested {args.cpus}')
-        allocation.update(status='configuring',allocated_step_cpus=cpus,slurm_job=fields)
-        save(state,allocation)
-        internal = [sys.executable,str(HERE/'setup.py'),'--compute','--job-id',str(job),
-                    '--project',str(args.project),'--cpus',str(args.cpus),'--server-cores',str(args.server_cores),
-                    '--gpu',args.gpu,'--memory',args.memory,'--time',args.time,'--partition',args.partition,
-                    '--output-dir',str(output)]
-        # Resolve Python after module loading and venv activation, not on login.
-        internal[0] = 'python'
-        if args.numa_node is not None:
-            internal += ['--numa-node',str(args.numa_node)]
-        if args.allow_remote_numa:
-            internal += ['--allow-remote-numa']
-        command = step_command(job,cpus)+['bash','-l',str(HERE/'bootstrap.sh'),str(args.project),
-                                        '1' if args.repair_install else '0']+internal
-        print('Setting up on compute node; log: '+str(output/'setup.log'),flush=True)
-        with (output/'setup.log').open('w') as log:
-            setup_step(command,log,args.setup_timeout)
-        report = json.loads((output/'settings.json').read_text())
-        if report['status']!='ready':
-            raise RuntimeError('Compute checks did not complete')
-        final_fields,_ = job_info(job)
-        if final_fields.get('JobState')!='RUNNING':
-            raise RuntimeError('Allocation ended during setup')
-        report.update(slurm_job=final_fields,allocation_created_by_setup=owned,
-                      virtualenv=str(args.project/'.venv'))
-        save(output/'settings.json',report)
-        allocation['status']='ready'
-        save(state,allocation)
+    if args.enter and not job:
+        raise RuntimeError('salloc did not provide SLURM_JOB_ID; refusing another allocation')
+    if not job:
+        # salloc keeps ownership until its command (and the compute shell) exits.
+        args.new_allocation=True
+        command=submission(args,output)+['python3']+forwarded(args,output)+['--enter']
+        save(output/'request.json',dict(requested=requested(args),command=command,status='allocating'))
+        print('Requesting allocation, then entering its compute shell:',flush=True)
+        print(shlex.join(command),flush=True)
+        return os.execvp(command[0],command)
+    fields,raw=job_info(job)
+    if fields.get('JobState')!='RUNNING':
+        raise RuntimeError('Existing allocation is not RUNNING: '+raw)
+    cpus=int(fields['NumCPUs'])
+    if cpus<args.cpus:
+        raise RuntimeError(f'Allocation has {cpus} CPUs; requested {args.cpus}')
+    save(output/'allocation.json',dict(job_id=str(job),created_by_setup=args.new_allocation,
+         allocated_step_cpus=cpus,status='configuring',slurm_job=fields,requested=requested(args)))
+    internal=['python']+forwarded(args,output)+['--compute','--job-id',str(job)]
+    command=['bash','-l',str(HERE/'session.sh'),str(args.project),
+             '1' if args.repair_install else '0',str(args.setup_timeout),str(output)]+internal
+    if not (os.environ.get('SLURM_STEP_ID') and os.environ.get('SLURM_JOB_ID')==str(job)):
+        command=step_command(job,cpus)+['--pty']+command
+    print(f'Entering compute shell for job {job}; setup log: {output / "setup.log"}',flush=True)
+    return os.execvp(command[0],command)
+
+
+def finish_compute(args, output):
+    compute(args,output)
+    report=json.loads((output/'settings.json').read_text())
+    fields,_=job_info(args.job_id)
+    if fields.get('JobState')!='RUNNING':
+        raise RuntimeError('Allocation ended during setup')
+    report.update(slurm_job=fields,allocation_created_by_setup=args.new_allocation,
+                  virtualenv=str(args.project/'.venv'),
+                  second_terminal_command=shlex.join(terminal_command(args.job_id,int(fields['NumCPUs']),output)))
+    save(output/'settings.json',report)
+    state=output/'allocation.json'
+    save(state,dict(status='ready',job_id=str(args.job_id),allocated_step_cpus=int(fields['NumCPUs']),
+                    created_by_setup=args.new_allocation,slurm_job=fields))
+    # Both the first shell and every second-terminal entry load this file.
+    rc='if [[ -f "$HOME/.bashrc" ]]; then source "$HOME/.bashrc"; fi\n'
+    rc+='source '+shlex.quote(str(output/'env.sh'))+' || exit 1\n'
+    rc+='printf \'PACE environment loaded: job %s, host %s, NUMA %s\\n\' "$EXP_JOB_ID" "$EXP_HOSTNAME" "$EXP_NUMA_NODE"\n'
+    (output/'session.bashrc').write_text(rc)
+    stream=io.StringIO()
+    with contextlib.redirect_stdout(stream):
         summary(report,state)
-    except BaseException as exc:
-        canceled = False
-        if owned and job:
-            try:
-                run(['scancel',str(job)],timeout=30)
-                canceled = True
-                print(f'Canceled this setup\'s allocation {job} after failure.',flush=True)
-            except Exception as cleanup:
-                print(f'Could not cancel owned job {job}: {cleanup}',file=sys.stderr)
-        if state.exists():
-            value=json.loads(state.read_text());value.update(status='failed',error=str(exc),canceled_by_setup=canceled)
-            save(state,value)
-        (output/'env.sh').unlink(missing_ok=True)
-        if (output/'settings.json').exists():
-            value=json.loads((output/'settings.json').read_text());value.update(status='failed',error=str(exc))
-            save(output/'settings.json',value)
-        raise
+    (output/'settings-summary.txt').write_text(stream.getvalue())
+    print(stream.getvalue(),end='',flush=True)
 
 
 def main():
@@ -343,6 +317,8 @@ def main():
     p.add_argument('--output-dir',type=Path)
     p.add_argument('--dry-run',action='store_true')
     p.add_argument('--compute',action='store_true',help=argparse.SUPPRESS)
+    p.add_argument('--enter',action='store_true',help=argparse.SUPPRESS)
+    p.add_argument('--new-allocation',action='store_true',help=argparse.SUPPRESS)
     args=p.parse_args()
     args.project=args.project.expanduser().resolve()
     args.gpu=args.gpu.lower()
@@ -365,11 +341,15 @@ def main():
     # Stale env.sh must never survive a failed rerun in a user-specified directory.
     (output/'env.sh').unlink(missing_ok=True)
     if args.compute:
-        compute(args,output)
+        try:
+            finish_compute(args,output)
+        except BaseException as exc:
+            (output/'env.sh').unlink(missing_ok=True)
+            if (output/'settings.json').exists():
+                report=json.loads((output/'settings.json').read_text())
+                report.update(status='failed',error=str(exc));save(output/'settings.json',report)
+            raise
     else:
-        def interrupted(signum,frame):
-            raise KeyboardInterrupt('Setup interrupted')
-        signal.signal(signal.SIGTERM,interrupted)
         manage(args,output)
 
 

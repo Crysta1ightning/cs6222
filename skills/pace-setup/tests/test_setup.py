@@ -23,7 +23,7 @@ def rows(start,count,node,socket=0):
 def options(root,job=None):
     return SimpleNamespace(project=root,cpus=16,server_cores=4,gpu='l40s',memory='32G',
         time='01:00:00',partition='ice-gpu',job_id=job,numa_node=None,allow_remote_numa=False,
-        wait_seconds=1,setup_timeout=1,repair_install=False)
+        wait_seconds=1,setup_timeout=1,repair_install=False,new_allocation=False,enter=False)
 
 
 class PlacementTests(unittest.TestCase):
@@ -82,6 +82,7 @@ class SetupTests(unittest.TestCase):
             self.assertIn('--cpus-per-task='+str(count),data['allocation_command'])
             self.assertIn('--gres=gpu:'+gpu+':1',data['allocation_command'])
             self.assertIn('--nodes=1',data['allocation_command'])
+            self.assertEqual(data['allocation_command'][0],'salloc')
 
     def test_pending_single_node_range_and_owner(self):
         raw=f'JobId=42 UserId=me({os.getuid()}) JobState=PENDING NumNodes=1-1 NumCPUs=16 Reason=Resources'
@@ -107,39 +108,56 @@ class SetupTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'no physical GPU index was guessed'):
                 setup.gpu_properties()
 
-    def test_failed_own_job_canceled_but_reused_job_preserved(self):
+    def test_new_setup_uses_salloc_and_existing_setup_enters_with_pty(self):
         for existing in [None,'42']:
             with tempfile.TemporaryDirectory() as d:
                 root=Path(d);args=options(root,existing)
-                def fake_run(command,**kwargs):
-                    if command[0]=='sbatch': return '42'
-                    if command[0]=='scancel': return ''
-                    raise AssertionError(command)
-                with patch.dict(os.environ,{},clear=True),patch.object(setup,'run',side_effect=fake_run) as run,\
-                     patch.object(setup,'job_info',side_effect=RuntimeError('test scheduler failure')),contextlib.redirect_stdout(io.StringIO()):
-                    with self.assertRaisesRegex(RuntimeError,'test scheduler failure'):
-                        setup.manage(args,root)
-                cancels=[c.args[0] for c in run.call_args_list if c.args[0][0]=='scancel']
-                self.assertEqual(cancels,[['scancel','42']] if existing is None else [])
+                fields=dict(JobState='RUNNING',NumCPUs='16')
+                with patch.dict(os.environ,{},clear=True),patch.object(setup,'os') as os_mock,\
+                     patch.object(setup,'job_info',return_value=(fields,'')),contextlib.redirect_stdout(io.StringIO()):
+                    os_mock.environ={}
+                    setup.manage(args,root)
+                command=os_mock.execvp.call_args.args[1]
+                self.assertEqual(command[0],'salloc' if existing is None else 'srun')
+                self.assertIn('--enter' if existing is None else '--pty',command)
+                self.assertNotIn('sbatch',command)
 
-    def test_success_persists_exports_and_keeps_own_job(self):
+    def test_success_saves_second_terminal_command_and_shell_environment(self):
         with tempfile.TemporaryDirectory() as d:
-            root=Path(d);args=options(root)
-            fields=dict(JobState='RUNNING',NumCPUs='16',TimeLimit='01:00:00',MinMemoryNode='32G')
-            def step(command,log,timeout):
+            root=Path(d);args=options(root,'42')
+            fields=dict(JobState='RUNNING',NumCPUs='32',TimeLimit='01:00:00',MinMemoryNode='32G')
+            def compute(args,root):
                 setup.save(root/'settings.json',dict(status='ready',job_id='42'))
                 (root/'env.sh').write_text('export EXP_THREADS=12\n')
-            with patch.dict(os.environ,{},clear=True),patch.object(setup,'run',return_value='42') as run,\
-                 patch.object(setup,'job_info',return_value=(fields,'')),patch.object(setup,'setup_step',side_effect=step),\
-                 patch.object(setup,'summary') as summary,contextlib.redirect_stdout(io.StringIO()):
-                setup.manage(args,root)
+            with patch.object(setup,'job_info',return_value=(fields,'')),patch.object(setup,'compute',side_effect=compute),\
+                 patch.object(setup,'summary'),contextlib.redirect_stdout(io.StringIO()):
+                setup.finish_compute(args,root)
             report=json.loads((root/'settings.json').read_text())
             self.assertEqual(report['slurm_job']['MinMemoryNode'],'32G')
-            self.assertTrue(report['allocation_created_by_setup'])
+            command=report['second_terminal_command']
+            self.assertIn('--jobid=42',command)
+            self.assertIn('--overlap',command)
+            self.assertIn('--cpus-per-task=32',command)
+            self.assertIn('--pty',command)
+            self.assertIn(str(root/'session.bashrc'),command)
+            self.assertIn('source '+str(root/'env.sh'),(root/'session.bashrc').read_text())
             self.assertTrue((root/'env.sh').exists())
             self.assertEqual(json.loads((root/'allocation.json').read_text())['status'],'ready')
-            self.assertFalse(any(c.args[0][0]=='scancel' for c in run.call_args_list))
-            summary.assert_called_once()
+
+    def test_interactive_session_automatically_loads_exports(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);bin_dir=root/'bin';bin_dir.mkdir()
+            fake=bin_dir/'bash'
+            fake.write_text('#!/bin/bash\nif [[ "$1" == -l ]]; then exit 0; fi\nsource "$2"\nprintf "loaded=%s\\n" "$EXP_THREADS"\n')
+            fake.chmod(0o700)
+            (root/'env.sh').write_text('export EXP_THREADS=12\n')
+            (root/'session.bashrc').write_text('source '+str(root/'env.sh')+'\n')
+            (root/'settings-summary.txt').write_text('READY: test fixture\n')
+            script=Path(setup.HERE)/'session.sh'
+            result=subprocess.run(['/bin/bash',str(script),str(root),'0','5',str(root),'unused'],
+                                  env=dict(os.environ,PATH=str(bin_dir)+':'+os.environ['PATH']),text=True,capture_output=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertIn('loaded=12',result.stdout)
 
     def test_source_guard_rejects_different_allocation(self):
         values=dict(EXP_JOB_ID='999999999',EXP_HOSTNAME='wrong-host',EXP_SERVER_CPUS='0',EXP_TOOL_CPUS='1',EXP_NUMA_NODE='0')

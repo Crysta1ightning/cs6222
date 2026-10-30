@@ -29,17 +29,24 @@ needed. Never reuse the historical CPU IDs 32–47 as defaults.
 
 Run `python3 <this-skill>/scripts/setup.py --cpus 16 --gpu l40s` with optional
 `--memory 64G`, `--time 02:00:00`, `--server-cores 4`, `--project PATH`, or
-`--job-id ID`. Do not use `--compute` directly. `--dry-run` prints the request
+`--job-id ID`. Do not use internal `--compute`/`--enter` directly. `--dry-run` prints the request
 without submitting, installing or allocating anything.
 
 Use an explicitly supplied job or the current `SLURM_JOB_ID` if present. Otherwise
-the helper submits a single persistent batch allocation, equivalent in resources
-to the manual's interactive allocation. The batch keeps the job alive after the
-agent's setup command exits, up to its Slurm time limit. It uses bounded Slurm
-commands, a ten-minute queue wait and a thirty-minute setup timeout by default;
-adjust `--wait-seconds` or `--setup-timeout` for the user's needs. Yield tool calls
-and give updates during long waits; inspect the printed `allocation.json` and
-`setup.log` for progress instead of launching duplicate allocations.
+the helper runs **salloc**, waits for its allocation, and uses **srun --pty** to
+enter the compute node. It performs setup there, then opens an interactive Bash
+shell that automatically sources the discovered environment. The first shell
+owns the new allocation: keep it open while experiments run; exiting it releases
+the allocation. It uses bounded Slurm commands, a ten-minute queue wait and a
+thirty-minute setup timeout by default;
+adjust `--wait-seconds` or `--setup-timeout` for the user's needs. Run this helper
+with a PTY (`exec_command` with `tty: true`) and yield during allocation/startup.
+Keep that exec session alive at the ready compute prompt; do not send Ctrl+D or
+terminate it when reporting completion. Subsequent agent commands can use the
+same session. Inspect `request.json`, `allocation.json` and `setup.log` for
+progress instead of launching duplicate allocations. A user can also run the
+helper directly in their ICE login terminal to get their own prepared compute
+shell. No batch keeper job is created.
 
 The helper loads `python/3.12.5` and `cuda/13.0.1`, reuses `.venv`, verifies the
 recorded SGLang base is an ancestor, checks dependencies, identifies CUDA logical
@@ -61,26 +68,39 @@ NUMA rules:
   cores. A remote common NUMA node requires explicit `--allow-remote-numa`;
   unknown GPU locality requires explicit `--numa-node` and must be reported as
   unverified GPU locality.
-- On failure/timeout/interruption, the helper cancels only a new job it created.
-  A reused user allocation is preserved. Do not cancel other jobs or retry
-  allocations indefinitely. Successful allocations remain active for experiments;
-  report their job ID and time limit so the user can release them later.
+- A failed setup closes its compute step; `salloc` releases its newly created
+  allocation when its command ends. A reused user allocation remains owned by
+  its original shell. Do not cancel other jobs or retry indefinitely. Report
+  the job ID/time limit and allocation lifetime clearly.
 
 ## Environment and subsequent work
 
-Success writes `settings.json` and a guarded `env.sh` under the printed setup
+Success writes `settings.json`, a guarded `env.sh`, and `session.bashrc` under the printed setup
 directory in `scripts/results/pace-setup/`. These contain the **actual** settings.
 Never call setup finished unless `settings.json` says `ready` and the GPU and
 memory checks passed. The memory probe verifies its own 32 MiB allocation; it
 does not prove future KV-buffer placement.
 
-For every subsequent agent experiment command, use the printed full-allocation
-`srun --jobid=ID --overlap -n1 -cN --cpu-bind=cores ...` prefix and source the
-absolute `env.sh` in that compute step. Do not source it on a login node. The
-guard rejects another host/job, insufficient CPU affinity or changed topology.
-Shell environment changes cannot propagate into an unrelated user terminal;
-explain that the user's own compute shell can source the same file once. There
-is no need for them to manually rediscover/export CPU IDs on every allocation.
+The first compute shell already has the exports loaded; run experiments there.
+For another terminal, always print the **complete command with actual job ID,
+allocated CPU count, and absolute rc-file path**, also saved as
+`second_terminal_command` in `settings.json`. Its form is:
+
+```bash
+srun --jobid=JOB_ID --overlap -N1 -n1 -cALLOCATED_CPUS --cpu-bind=cores \
+  --immediate=30 --pty bash --rcfile /ABSOLUTE/SETUP/session.bashrc -i
+```
+
+Run that from another ICE **login** terminal. It enters the same compute node
+and automatically loads modules, venv and identical exports; no manual CPU
+discovery or export is needed. Exiting this second shell only ends its step.
+Use the full allocated CPU count for entry, then let experiment launchers bind
+to their disjoint subsets. `--overlap` allows the shell steps to coexist; it
+does not authorize overlapping benchmarks on the same experiment resources.
+The environment guard rejects another host/job, insufficient CPU affinity or
+changed topology. Do not source `env.sh` on a login node. For noninteractive
+agent calls outside the original PTY, use the printed `srun` prefix and source
+the same environment in that compute step.
 
 Environment variables describe placement; they do not bind arbitrary processes
 by themselves. Existing `memory-experiment/launch-stream-aware.sh` and
@@ -98,6 +118,8 @@ SGLang commit/local changes, and check results. Print the exact generated export
 lines, especially `EXP_SERVER_CPUS`, `EXP_TOOL_CPUS`, `EXP_NUMA_NODE`, `EXP_THREADS`,
 `EXP_RESULTS`, `EXP_JOB_ID`, `EXP_ENV_FILE`, `STREAM_CONTROL_ROOT`,
 `STREAM_RESULT_ROOT` and `TRACE_RESULT_ROOT`. Link the report and environment file.
+Include the exact **second-terminal command** every time setup succeeds, and
+state that the first compute prompt already has these exports loaded.
 Say whether a server/experiment was started (default: neither). If setup is
 pending or failed, say so and do not invent CPU IDs or present defaults as
 verified values.
