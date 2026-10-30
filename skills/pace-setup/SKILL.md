@@ -16,6 +16,7 @@ Examples the user can type:
 - `$pace-setup` — defaults: 16 physical CPU cores, one L40S, 32G host RAM, one hour.
 - `$pace-setup with 32 CPU cores, an H100, and 128G RAM`.
 - `$pace-setup using my existing job 1234567 with 8 CPU cores and an L40S`.
+- `$pace-setup with 16 CPU cores and rtx_pro_6000_blackwell in ice-bw-gpu`.
 
 Interpret CPU count as `--cpus-per-task` on **one compute node**, not a count of
 compute nodes. Keep user choices for this invocation; use defaults for omitted
@@ -29,7 +30,8 @@ needed. Never reuse the historical CPU IDs 32–47 as defaults.
 
 Run `python3 <this-skill>/scripts/setup.py --cpus 16 --gpu l40s` with optional
 `--memory 64G`, `--time 02:00:00`, `--server-cores 4`, `--project PATH`, or
-`--job-id ID`. Do not use internal `--compute`/`--enter` directly. `--dry-run` prints the request
+`--job-id ID`. Select a different partition with `--partition ice-bw-gpu`.
+Do not use internal `--compute`/`--enter` directly. `--dry-run` prints the request
 without submitting, installing or allocating anything.
 
 Before a new allocation, the helper reads Slurm's current node inventory. It
@@ -49,6 +51,12 @@ suggestion as a pilot with a changed server/tool split. Never silently change GP
 type, CPU count or memory. Wait for the user's alternative selection, unless
 they have explicitly authorized one. Do not suggest AMD GPUs for this CUDA
 environment. Save the snapshot in `availability.json`.
+When standard ICE has no same-size candidate, also check `ice-bw-gpu` for
+`rtx_pro_6000_blackwell` before suggesting fewer CPU cores. Make the partition
+change explicit and wait for the user's choice. Hardware capacity is not proof
+of account eligibility or working inference kernels; actual allocation, CUDA
+and NUMA checks remain necessary, followed by a small inference pilot for new
+GPU models before performance measurements.
 
 `--check-resources` explicitly prints the current read-only snapshot without
 allocating. `--queue --wait-seconds 600` explicitly opts into waiting despite a

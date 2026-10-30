@@ -43,6 +43,16 @@ class ResourceTests(unittest.TestCase):
         self.assertEqual(result['alternatives'][0]['gpu'],'h100')
         self.assertFalse(result['preferred_nodes'][0]['numa_placement_verified'])
 
+    def test_blackwell_other_partition_before_smaller_cpu_pilot(self):
+        args=SimpleNamespace(partition='ice-gpu',cpus=16,memory='32G',gpu='h100')
+        raw=node(gpu='h100',gpu_alloc=8)+'\n'+node(gpu='rtx_pro_6000_blackwell',part='ice-bw-gpu')
+        report=resources.snapshot(lambda *a,**k:raw,args)
+        self.assertFalse(report['preferred_looks_available'])
+        self.assertEqual(report['alternatives'][0]['partition'],'ice-bw-gpu')
+        self.assertEqual(report['alternatives'][0]['cpus'],16)
+        self.assertFalse(report['smaller_cpu_alternatives'])
+        self.assertEqual(args.partition,'ice-gpu')
+
     def test_generic_allocated_gpu_count_used_conservatively(self):
         text=node(gpu_alloc=8).replace(',gres/gpu:l40s=8 FreeMem',' FreeMem')
         self.assertFalse(self.inspect(text)['preferred_looks_available'])

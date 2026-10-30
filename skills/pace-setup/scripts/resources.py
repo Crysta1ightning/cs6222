@@ -1,7 +1,7 @@
 """Read scheduler-accounted capacity; never submit jobs or assume NUMA locality."""
 import re
 
-RECOMMEND = ('l40s','h100','h200','a100','a40')
+RECOMMEND = ('l40s','h100','h200','a100','a40','rtx_pro_6000_blackwell')
 UNUSABLE = ('DOWN','DRAIN','FAIL','RESERVED','MAINT','POWER','NOT_RESPONDING','UNKNOWN','COMPLETING','FUTURE')
 
 
@@ -71,7 +71,7 @@ def inspect_nodes(text,partition,cpus,memory,gpu):
         available=[n for n in candidates if n['gpu']==kind]
         if available and kind!=gpu:
             available.sort(key=lambda n:(-n['estimated_free_physical_cores'],-n['free_host_memory_GiB'],n['node']))
-            alternatives.append(dict(gpu=kind,cpus=cpus,memory=memory,nodes=available))
+            alternatives.append(dict(gpu=kind,cpus=cpus,memory=memory,partition=partition,nodes=available))
     return dict(preferred_gpu=gpu,cpus=cpus,memory=memory,partition=partition,
                 preferred_looks_available=any(n['gpu']==gpu for n in candidates),
                 preferred_nodes=[n for n in nodes if n['gpu']==gpu],alternatives=alternatives,
@@ -82,6 +82,12 @@ def snapshot(run,args):
     raw=run(['scontrol','show','nodes','--oneliner'],timeout=25)
     result=inspect_nodes(raw,args.partition,args.cpus,args.memory,args.gpu)
     result['smaller_cpu_alternatives']=[]
+    # The separate ICE Blackwell partition can preserve the requested CPU/RAM
+    # budget when standard ICE GPUs are busy. Recommend; never switch silently.
+    if not result['preferred_looks_available'] and not result['alternatives'] and args.partition!='ice-bw-gpu':
+        blackwell=inspect_nodes(raw,'ice-bw-gpu',args.cpus,args.memory,args.gpu)
+        result['alternatives']=[item for item in blackwell['alternatives']
+                                if item['gpu']=='rtx_pro_6000_blackwell']
     if not result['preferred_looks_available'] and not result['alternatives']:
         for count in sorted({args.cpus//2,4,2},reverse=True):
             if not 2<=count<args.cpus:
@@ -102,7 +108,8 @@ def recommendation_text(report):
     if report['alternatives']:
         for item in report['alternatives'][:3]:
             node=item['nodes'][0]
-            lines.append(f"Alternative: {item['gpu']} + {item['cpus']} cores + {item['memory']}; "
+            lines.append(f"Alternative: {item['gpu']} + {item['cpus']} cores + {item['memory']} "
+                         f"in {item.get('partition',report['partition'])}; "
                          f"{node['node']} reports {node['free_gpus']} free GPU(s), "
                          f"{node['estimated_free_physical_cores']} free core equivalents, "
                          f"{node['free_host_memory_GiB']} GiB unallocated host RAM.")

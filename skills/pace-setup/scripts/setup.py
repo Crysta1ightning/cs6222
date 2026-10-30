@@ -99,6 +99,12 @@ def gpu_properties():
                 cuda_visible_devices=os.environ.get('CUDA_VISIBLE_DEVICES'))
 
 
+def gpu_matches(requested, actual):
+    family=re.match(r'[a-z]+\d+[a-z]*',requested.lower())
+    expected=family.group() if family else re.sub('[^a-z0-9]','',requested.lower())
+    return expected in re.sub('[^a-z0-9]','',actual.lower())
+
+
 PAGE_PROBE = '''import ctypes,json,mmap,os
 size=32*1024*1024
 memory=mmap.mmap(-1,size)
@@ -144,9 +150,7 @@ def compute(args, output):
                               'numa':['numactl','--hardware'],'gpu_topology':['nvidia-smi','topo','-m']}.items():
             report[name] = run(command)
         gpu = gpu_properties()
-        family = re.match(r'[a-z]+\d+[a-z]*',args.gpu.lower())
-        family = family.group() if family else args.gpu.lower()
-        if family not in re.sub('[^a-z0-9]','',gpu['name'].lower()):
+        if not gpu_matches(args.gpu,gpu['name']):
             raise RuntimeError(f"Requested GPU type {args.gpu} does not match {gpu['name']}")
         gpu_sysfs = Path('/sys/bus/pci/devices')/pci_path(gpu['pci_bus_id'])/'numa_node'
         gpu_node = int(gpu_sysfs.read_text()) if gpu_sysfs.exists() else -1

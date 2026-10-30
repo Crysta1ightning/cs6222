@@ -72,6 +72,11 @@ class PlacementTests(unittest.TestCase):
 
 
 class SetupTests(unittest.TestCase):
+    def test_slurm_blackwell_name_matches_nvidia_name(self):
+        self.assertTrue(setup.gpu_matches('rtx_pro_6000_blackwell','NVIDIA RTX PRO 6000 Blackwell Server Edition'))
+        self.assertTrue(setup.gpu_matches('h100','NVIDIA H100 80GB HBM3'))
+        self.assertFalse(setup.gpu_matches('h100','NVIDIA H200'))
+
     def test_dry_run_defaults_and_overrides_do_not_submit(self):
         for flags,count,gpu in [([],16,'l40s'),(['--cpus','32','--gpu','h100','--memory','128G'],32,'h100')]:
             stream=io.StringIO()
