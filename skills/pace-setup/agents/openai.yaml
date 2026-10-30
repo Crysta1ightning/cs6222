@@ -1,0 +1,4 @@
+interface:
+  display_name: "PACE GPU Experiment Setup"
+  short_description: "Allocate GPUs and verify shared NUMA placement"
+  default_prompt: "Use $pace-setup to prepare my PACE experiment allocation and report its settings and environment variables."
