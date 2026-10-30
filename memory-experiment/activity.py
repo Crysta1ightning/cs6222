@@ -72,6 +72,12 @@ class ActivityClient:
 
 
 def run_stream(binary, env, *, client=None, timeout=180, warmup=False, record=None, before_launch=None):
+    return run_command([str(binary)], env, client=client, timeout=timeout,
+                       warmup=warmup, record=record, before_launch=before_launch)
+
+
+def run_command(command, env, *, client=None, timeout=180, warmup=False,
+                record=None, before_launch=None, cancel=None):
     """Acknowledge START before Popen; END follows exit/kill+wait on every path."""
     record = record if record is not None else {}
     tool_id = uuid.uuid4().hex
@@ -83,23 +89,27 @@ def run_stream(binary, env, *, client=None, timeout=180, warmup=False, record=No
         if before_launch:
             before_launch()
         record["start_ns"] = time.monotonic_ns()
-        process = subprocess.Popen([str(binary)], env=env, stdout=subprocess.PIPE,
+        process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, text=True, start_new_session=True)
         deadline = time.monotonic() + timeout
         lease = record.get("start_ack", {}).get("lease_seconds", 15)
         interval = min(2.0, lease / 3)
+        heartbeat_at = time.monotonic() + interval
         while True:
+            if cancel is not None and cancel.is_set():
+                raise RuntimeError("Tool canceled after replay failure")
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise subprocess.TimeoutExpired([str(binary)], timeout)
+                raise subprocess.TimeoutExpired(command, timeout)
             try:
-                stdout, stderr = process.communicate(timeout=min(interval, remaining))
+                stdout, stderr = process.communicate(timeout=min(interval, remaining, 0.25 if cancel else interval))
                 record["end_ns"] = time.monotonic_ns()
                 record["returncode"] = process.returncode
-                return subprocess.CompletedProcess([str(binary)], process.returncode, stdout, stderr)
+                return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
             except subprocess.TimeoutExpired:
-                if client:
+                if client and time.monotonic() >= heartbeat_at:
                     client.rpc("TOOL_HEARTBEAT", tool_id=tool_id)
+                    heartbeat_at = time.monotonic() + interval
     except BaseException as exc:
         record["error"] = str(exc) or type(exc).__name__
         raise

@@ -32,10 +32,16 @@ After editing SGLang, regenerate the reproducible patch:
 bash scripts/memory-experiment/sglang-patches/export.sh ~/cs6222/sglang
 ```
 
-Existing local build-script/hash modifications were preserved. No teammate
-activity-aware implementation was found in the local checkout or branches.
+Existing local build-script/hash modifications were preserved. At implementation
+time no teammate activity-aware implementation was present locally. The later
+merged `backup-policy/` implementation remains separate and its SGLang patch
+must not be applied on top of this controller.
 The controller reuses the existing merged write queue, node-split handling,
 GPU lock receipts, write acknowledgments, and `flush_pending_backups` hooks.
+
+For a session-based workload with real trace-derived token lengths and tool
+timing, see [TraceLab replay](../trace-replay/README.md). It uses this same
+controller and launch configuration; the fresh-prompt runner remains a diagnostic.
 
 ## Semantics and supported scope
 
