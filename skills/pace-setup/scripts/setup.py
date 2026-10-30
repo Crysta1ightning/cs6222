@@ -14,6 +14,7 @@ import subprocess
 import sys
 
 from topology import PlacementError, choose, discover, parse_list, pci_path
+from resources import snapshot, recommendation_text
 
 HERE = Path(__file__).resolve().parent
 BASE = 'e00930c5489053f26d86b179cee0d087f846acbb'
@@ -240,6 +241,8 @@ def forwarded(args, output):
         command+=['--allow-remote-numa']
     if args.repair_install:
         command+=['--repair-install']
+    if args.queue:
+        command+=['--queue']
     if args.new_allocation:
         command+=['--new-allocation']
     return command
@@ -250,6 +253,11 @@ def manage(args, output):
     if args.enter and not job:
         raise RuntimeError('salloc did not provide SLURM_JOB_ID; refusing another allocation')
     if not job:
+        availability=snapshot(run,args)
+        save(output/'availability.json',availability)
+        if not availability['preferred_looks_available'] and not args.queue:
+            print(recommendation_text(availability),flush=True)
+            raise SystemExit(3)  # Availability recommendation, not completed setup.
         # salloc keeps ownership until its command (and the compute shell) exits.
         args.new_allocation=True
         command=submission(args,output)+['python3']+forwarded(args,output)+['--enter']
@@ -312,7 +320,9 @@ def main():
     p.add_argument('--numa-node',type=int)
     p.add_argument('--allow-remote-numa',action='store_true')
     p.add_argument('--repair-install',action='store_true',help='explicitly reinstall the manual\'s pinned dependencies')
-    p.add_argument('--wait-seconds',type=int,default=600)
+    p.add_argument('--wait-seconds',type=int,default=30)
+    p.add_argument('--queue',action='store_true',help='explicitly wait even when preferred resources look busy')
+    p.add_argument('--check-resources',action='store_true',help='read availability and recommendations without allocating')
     p.add_argument('--setup-timeout',type=int,default=1800)
     p.add_argument('--output-dir',type=Path)
     p.add_argument('--dry-run',action='store_true')
@@ -334,6 +344,9 @@ def main():
     if args.dry_run:
         print(json.dumps(dict(requested=requested(args),allocation_command=submission(args,output),
                               reuses_job=args.job_id or os.environ.get('SLURM_JOB_ID'),output_dir=str(output)),indent=2))
+        return
+    if args.check_resources:
+        print(json.dumps(snapshot(run,args),indent=2))
         return
     if not args.project.is_dir():
         p.error('Project directory does not exist')

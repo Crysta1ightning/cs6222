@@ -32,12 +32,36 @@ Run `python3 <this-skill>/scripts/setup.py --cpus 16 --gpu l40s` with optional
 `--job-id ID`. Do not use internal `--compute`/`--enter` directly. `--dry-run` prints the request
 without submitting, installing or allocating anything.
 
+Before a new allocation, the helper reads Slurm's current node inventory. It
+checks partition membership, node state, GPU totals minus allocated GPUs,
+scheduler CPU capacity minus allocated CPUs, and configured RAM minus allocated
+RAM/reserved memory. `MIXED` alone does not mean a GPU is free; `FreeMem` and CPU
+load do not determine schedulable capacity. Drained, reserved and down nodes are
+excluded. The socket/core check is only a coarse capacity filter; NUMA locality
+and the actual CPU IDs still must be verified after allocation.
+
+If the preferred/default combination has a capacity candidate, **proceed directly
+with that same request**. Do not show a resource menu, alternatives, or ask the
+user to reconfirm it. If it does not, do not submit a queue request by default:
+give a concise recommendation from compatible NVIDIA GPUs, retaining the
+requested CPU count/RAM where possible. If none fits, label any smaller-CPU
+suggestion as a pilot with a changed server/tool split. Never silently change GPU
+type, CPU count or memory. Wait for the user's alternative selection, unless
+they have explicitly authorized one. Do not suggest AMD GPUs for this CUDA
+environment. Save the snapshot in `availability.json`.
+
+`--check-resources` explicitly prints the current read-only snapshot without
+allocating. `--queue --wait-seconds 600` explicitly opts into waiting despite a
+busy snapshot. Default allocation wait is 30 seconds to bound races or scheduling
+constraints after a favorable snapshot. A free-capacity snapshot does not bypass
+Slurm priorities, reservations, account restrictions or GRES/NUMA constraints.
+
 Use an explicitly supplied job or the current `SLURM_JOB_ID` if present. Otherwise
 the helper runs **salloc**, waits for its allocation, and uses **srun --pty** to
 enter the compute node. It performs setup there, then opens an interactive Bash
 shell that automatically sources the discovered environment. The first shell
 owns the new allocation: keep it open while experiments run; exiting it releases
-the allocation. It uses bounded Slurm commands, a ten-minute queue wait and a
+the allocation. It uses bounded Slurm commands, a thirty-second allocation wait and a
 thirty-minute setup timeout by default;
 adjust `--wait-seconds` or `--setup-timeout` for the user's needs. Run this helper
 with a PTY (`exec_command` with `tty: true`) and yield during allocation/startup.

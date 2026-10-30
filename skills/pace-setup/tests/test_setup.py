@@ -23,7 +23,7 @@ def rows(start,count,node,socket=0):
 def options(root,job=None):
     return SimpleNamespace(project=root,cpus=16,server_cores=4,gpu='l40s',memory='32G',
         time='01:00:00',partition='ice-gpu',job_id=job,numa_node=None,allow_remote_numa=False,
-        wait_seconds=1,setup_timeout=1,repair_install=False,new_allocation=False,enter=False)
+        wait_seconds=1,setup_timeout=1,repair_install=False,new_allocation=False,enter=False,queue=False)
 
 
 class PlacementTests(unittest.TestCase):
@@ -114,6 +114,7 @@ class SetupTests(unittest.TestCase):
                 root=Path(d);args=options(root,existing)
                 fields=dict(JobState='RUNNING',NumCPUs='16')
                 with patch.dict(os.environ,{},clear=True),patch.object(setup,'os') as os_mock,\
+                     patch.object(setup,'snapshot',return_value=dict(preferred_looks_available=True)),\
                      patch.object(setup,'job_info',return_value=(fields,'')),contextlib.redirect_stdout(io.StringIO()):
                     os_mock.environ={}
                     setup.manage(args,root)
