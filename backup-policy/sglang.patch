@@ -1,0 +1,144 @@
+diff --git a/python/sglang/srt/managers/cache_controller.py b/python/sglang/srt/managers/cache_controller.py
+index 115720b06f..651231d86b 100644
+--- a/python/sglang/srt/managers/cache_controller.py
++++ b/python/sglang/srt/managers/cache_controller.py
+@@ -40,6 +40,7 @@ from sglang.srt.layers.dp_attention import (
+     is_dp_attention_enabled,
+ )
+ from sglang.srt.mem_cache.l2_transfer import L2Transfer, L2TransferEngine
++from sglang.srt.mem_cache.deferred_backup import BackupGate
+ from sglang.srt.mem_cache.memory_pool import MLATokenToKVPool
+ from sglang.srt.mem_cache.utils import get_storage_hash_str
+ from sglang.srt.runtime_context import get_parallel
+@@ -357,6 +358,13 @@ class HiCacheController:
+         # self.write_queue = PriorityQueue[CacheOperation]()
+         self.load_queue: List[CacheOperation] = []
+         self.write_queue: List[CacheOperation] = []
++        self.write_queue_bytes = 0
++        self.backup_gate = BackupGate.from_env()
++        if self.backup_gate is not None:
++            if write_policy != "write_through" or host_memory_mode != "cache" or storage_backend:
++                raise ValueError("CS6222 policy requires write_through, host cache mode, no storage backend")
++            if torch.distributed.is_initialized() and torch.distributed.get_world_size() != 1:
++                raise ValueError("CS6222 backup policy supports a single GPU/rank only")
+         self.ack_load_queue: List[HiCacheAck] = []
+         # Set by the scheduler to the forward stream; gates load-back H2D
+         # behind in-flight forwards (see start_loading).
+@@ -755,7 +763,10 @@ class HiCacheController:
+         self._stop_storage_threads()
+ 
+         self.write_queue.clear()
++        self.write_queue_bytes = 0
+         self.load_queue.clear()
++        if self.backup_gate is not None:
++            self.backup_gate.reset()
+         self.ack_write_queue.clear()
+         self.ack_load_queue.clear()
+         if self.enable_storage:
+@@ -813,19 +824,23 @@ class HiCacheController:
+         host_indices = self.mem_pool_host.alloc(len(device_indices))
+         if host_indices is None:
+             return None
+-        self.write_queue.append(
+-            CacheOperation(host_indices, device_indices, node_id, priority)
+-        )
+-        self.start_writing()
++        op = CacheOperation(host_indices, device_indices, node_id, priority)
++        self.write_queue.append(op)
++        self.write_queue_bytes += self._transfer_num_bytes(op)
++        self.start_writing(enqueue=True)
+         return host_indices
+ 
+-    def start_writing(self) -> None:
++    def start_writing(self, force: bool = False, enqueue: bool = False) -> None:
+         if len(self.write_queue) == 0:
+             return
++        if self.backup_gate is not None:
++            if not self.backup_gate.decide(self.write_queue_bytes, force=force, enqueue=enqueue):
++                return
+ 
+         op = CacheOperation.merge_ops(self.write_queue)
+         host_indices, device_indices, pool_transfers = self._move_write_operation(op)
+         self.write_queue.clear()
++        self.write_queue_bytes = 0
+ 
+         completion = self.l2_transfer_engine.submit_device_to_host(
+             self._l2_transfers(host_indices, device_indices, pool_transfers)
+diff --git a/python/sglang/srt/mem_cache/hybrid_cache/hybrid_cache_controller.py b/python/sglang/srt/mem_cache/hybrid_cache/hybrid_cache_controller.py
+index 89482ce48c..a036f4b8bc 100644
+--- a/python/sglang/srt/mem_cache/hybrid_cache/hybrid_cache_controller.py
++++ b/python/sglang/srt/mem_cache/hybrid_cache/hybrid_cache_controller.py
+@@ -523,17 +523,17 @@ class HybridCacheController(BaseHiCacheController):
+             return None
+         host_indices, pool_transfers = allocation
+ 
+-        self.write_queue.append(
+-            CacheOperation(
+-                host_indices,
+-                device_indices,
+-                node_id,
+-                priority,
+-                pool_transfers=pool_transfers or None,
+-            )
++        op = CacheOperation(
++            host_indices,
++            device_indices,
++            node_id,
++            priority,
++            pool_transfers=pool_transfers or None,
+         )
++        self.write_queue.append(op)
++        self.write_queue_bytes += self._transfer_num_bytes(op)
+         if flush:
+-            self.start_writing()
++            self.start_writing(enqueue=True)
+         return host_indices
+ 
+     def _uses_shared_host_domain(
+diff --git a/python/sglang/srt/mem_cache/unified_radix_cache.py b/python/sglang/srt/mem_cache/unified_radix_cache.py
+index 421a215722..9dfe00d130 100644
+--- a/python/sglang/srt/mem_cache/unified_radix_cache.py
++++ b/python/sglang/srt/mem_cache/unified_radix_cache.py
+@@ -715,6 +715,33 @@ class UnifiedRadixCache(BasePrefixCache):
+             available_size_targets=available_size_targets,
+         )
+ 
++        # Pending backups pin their device rows, but older unprotected rows
++        # may already satisfy eviction. Only drain if the first pass falls
++        # short, then retry with the cumulative tracker (not a fresh quota).
++        if (
++            self.cache_controller is not None
++            and self.cache_controller.backup_gate is not None
++            and self.ongoing_write_through
++        ):
++            shortfall = any(
++                (
++                    self._component_available_size(available_size_targets[ct][0])
++                    < available_size_targets[ct][1]
++                    if available_size_targets is not None
++                    and ct in available_size_targets
++                    else tracker.get(ct, 0) < requested
++                )
++                for ct, requested in request_by_type.items()
++                if requested > 0
++            )
++            if shortfall:
++                self.writing_check(write_back=True)
++                self._evict_components(
++                    request_by_type,
++                    tracker,
++                    available_size_targets=available_size_targets,
++                )
++
+         if (
+             self.cache_controller is not None
+             and self.cache_controller.write_policy == "write_back"
+@@ -3295,7 +3322,7 @@ class UnifiedRadixCache(BasePrefixCache):
+ 
+         if write_back:
+             # Blocking: submit what is still queued, then wait for every ack.
+-            cc.start_writing()
++            cc.start_writing(force=True)
+             while self.ongoing_write_through:
+                 for ack in cc.ack_write_queue:
+                     ack.finish_event.synchronize()

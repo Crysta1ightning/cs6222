@@ -1,2 +1,3 @@
 # Unified-diff context contains required single-space blank lines.
 memory-experiment/sglang-patches/*.patch -whitespace
+backup-policy/sglang.patch -whitespace
