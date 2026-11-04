@@ -9,6 +9,28 @@ import time
 import uuid
 
 
+def connect_bounded(channel, path, timeout, record):
+    """Wait for a busy UNIX listen queue without retrying a transmitted event."""
+    deadline = time.monotonic() + timeout
+    retries = 0
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("controller connection queue remained busy")
+        channel.settimeout(remaining)
+        try:
+            channel.connect(path)
+            record['connect_retries'] = retries
+            channel.settimeout(max(0.001, deadline - time.monotonic()))
+            return
+        except BlockingIOError:
+            # Linux AF_UNIX can return EAGAIN immediately for a full backlog,
+            # even with a socket timeout. No request has been sent yet.
+            retries += 1
+            record['connect_retries'] = retries
+            time.sleep(min(0.01, max(0, deadline - time.monotonic())))
+
+
 class ActivityClient:
     def __init__(self, path, mode, timeout=2.0):
         self.path, self.mode, self.timeout = str(path), mode, timeout
@@ -23,8 +45,7 @@ class ActivityClient:
         self.events.append(record)
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
-                channel.settimeout(self.timeout)
-                channel.connect(self.path)
+                connect_bounded(channel, self.path, self.timeout, record)
                 channel.sendall(json.dumps(request).encode() + b"\n")
                 with channel.makefile("rb") as reader:
                     frame = reader.readline(1024 * 1024 + 1)

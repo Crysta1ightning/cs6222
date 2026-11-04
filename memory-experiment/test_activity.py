@@ -9,9 +9,9 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
-from activity import ActivityClient, run_stream
+from activity import ActivityClient, run_stream, connect_bounded
 
 HERE = Path(__file__).resolve().parent
 SOURCE = HERE.parents[1] / "sglang/python/sglang/srt/mem_cache/stream_activity.py"
@@ -19,6 +19,25 @@ spec = importlib.util.spec_from_file_location("stream_activity", SOURCE)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 ActivityController = module.ActivityController
+
+
+class BusyQueue(unittest.TestCase):
+    def test_transient_full_queue_recovers_before_sending(self):
+        channel = Mock()
+        channel.connect.side_effect = [BlockingIOError(11, 'busy'), BlockingIOError(11, 'busy'), None]
+        record = {}
+        connect_bounded(channel, '/unused', 1, record)
+        self.assertEqual(record['connect_retries'], 2)
+        channel.sendall.assert_not_called()
+
+    def test_full_queue_has_bounded_wait(self):
+        channel = Mock()
+        channel.connect.side_effect = BlockingIOError(11, 'busy')
+        start = time.monotonic()
+        with self.assertRaises(TimeoutError):
+            connect_bounded(channel, '/unused', 0.02, {})
+        self.assertLess(time.monotonic() - start, 0.5)
+        channel.sendall.assert_not_called()
 
 
 class Decisions(unittest.TestCase):
