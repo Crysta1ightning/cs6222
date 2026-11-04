@@ -46,6 +46,8 @@ if [[ "$KIND" == stream ]]; then
   bash "$PROJECT/scripts/memory-experiment/build.sh" 5
 fi
 server_pid=''
+controller_journal=''
+controller_archive=''
 stop_server() {
   if [[ -n "$server_pid" ]]; then
     kill -TERM -- "-$server_pid" 2>/dev/null || true
@@ -56,6 +58,9 @@ stop_server() {
     kill -KILL -- "-$server_pid" 2>/dev/null || true
     wait "$server_pid" 2>/dev/null || true
     server_pid=''
+  fi
+  if [[ -n "$controller_journal" && -f "$controller_journal" ]]; then
+    cp "$controller_journal" "$controller_archive"
   fi
 }
 trap stop_server EXIT
@@ -75,7 +80,12 @@ else:
     raise SystemExit('Port 30000 is already occupied. Stop your existing server before this comparison.')
 PY
   mkdir -p "$STREAM_RESULT_ROOT/$mode"
-  setsid bash "$PROJECT/scripts/memory-experiment/launch-stream-aware.sh" "$mode" \
+  # Keep synchronous scheduler journal writes off the shared home filesystem.
+  # Archive after shutdown; replay reads this local journal during each trial.
+  controller_journal="$STREAM_CONTROL_ROOT/$mode.jsonl"
+  controller_archive="$STREAM_RESULT_ROOT/$mode/controller.jsonl"
+  SGLANG_STREAM_CONTROLLER_LOG="$controller_journal" \
+    setsid bash "$PROJECT/scripts/memory-experiment/launch-stream-aware.sh" "$mode" \
     >"$STREAM_RESULT_ROOT/$mode/server.log" 2>&1 &
   server_pid=$!
   ready=0
