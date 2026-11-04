@@ -67,6 +67,14 @@ recorded, so this intervention does change trace timing. Increasing this limit
 can multiply the 1.5 GiB per-process footprint and OpenMP thread count. No bandwidth
 estimation or original tool-pressure classification is claimed.
 
+Replay uses a bounded `--control-timeout` of ten seconds by default, below the
+15-second tool lease, and records it as a comparison parameter. Busy UNIX listen
+queues are retried only before an event is transmitted. Each comparison uses a
+new private socket directory; the scheduler journal stays on node-local storage
+and is archived to each mode's result directory when its server stops. STREAM's
+OpenMP core binding is disabled inside the server launcher so child workers can
+use the full assigned server CPU set.
+
 The controller cannot cancel a copy already submitted before a tool starts.
 In this closed-loop replay it can affect optional work still pending, or work
 from other sessions during tool activity. It may have little effect when those
