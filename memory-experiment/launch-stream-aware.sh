@@ -30,6 +30,11 @@ export SGLANG_STREAM_CONTROLLER_LOG="$RESULT_DIR/controller.jsonl"
 export SGLANG_STREAM_MAX_PENDING_TOKENS="${SGLANG_STREAM_MAX_PENDING_TOKENS:-4096}"
 export SGLANG_STREAM_MAX_DEFER_SECONDS="${SGLANG_STREAM_MAX_DEFER_SECONDS:-2}"
 printf 'Control socket: %s\nController log: %s\n' "$SGLANG_STREAM_CONTROL_SOCKET" "$SGLANG_STREAM_CONTROLLER_LOG"
+# STREAM's OpenMP placement must not bind the server's importing/main thread
+# to a single core: spawned scheduler/detokenizer workers inherit that affinity.
+# numactl still restricts every server worker to EXP_SERVER_CPUS.
+export OMP_PROC_BIND=FALSE
+unset OMP_PLACES
 exec numactl --physcpubind="$EXP_SERVER_CPUS" --membind="$EXP_NUMA_NODE" \
   sglang serve Qwen/Qwen3-0.6B --host 127.0.0.1 --port 30000 \
   --mem-fraction-static 0.30 --max-total-tokens 8192 --context-length 4096 \
