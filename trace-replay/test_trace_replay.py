@@ -150,7 +150,7 @@ class LocalReplayTests(unittest.TestCase):
         plan=make_plan(self.root)
         args=types.SimpleNamespace(max_seconds=5,max_stream_processes=1,tool_workload='stream',
             control_socket=self.root/'control.sock',controller_mode='defer',threads=1,
-            stream_binary=Path('/bin/false'),tool_timeout=3)
+            stream_binary=Path('/bin/false'),tool_timeout=3,control_timeout=10)
         runner=replay.Replay(args,plan,list(range(100,1000)))
         with self.assertRaises(subprocess.CalledProcessError):
             runner.tool(dict(index=0,name='surrogate',offset_seconds=0,duration_seconds=0),time.monotonic(),'a',0)
