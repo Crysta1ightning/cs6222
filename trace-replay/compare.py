@@ -18,7 +18,7 @@ def signature(data):
     info=data['server_info'].get('server_args',data['server_info'])
     return dict(plan_sha256=data['plan_sha256'],tool_workload=data['tool_workload'],
                 pool=data['token_pool_sha256'],binary=data.get('stream_binary_sha256'),
-                replay={k:config.get(k) for k in ['threads','max_active_sessions','max_stream_processes','tail_requests','request_timeout','tool_timeout','drain_timeout','max_seconds','model']},
+                replay={k:config.get(k) for k in ['threads','max_active_sessions','max_stream_processes','tail_requests','control_timeout','request_timeout','tool_timeout','drain_timeout','max_seconds','model']},
                 hostname=data.get('hostname'),affinity=data.get('cpu_affinity'),
                 numa=data.get('numa',{}).get('stdout'),
                 server={k:info.get(k) for k in ['model_path','context_length','max_total_tokens','mem_fraction_static','hicache_size','hicache_ratio','hicache_write_policy','disable_cuda_graph','dtype','page_size','tp_size']},

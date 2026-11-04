@@ -168,7 +168,8 @@ class Replay:
                 self.stream_slots.release()
 
     def execute_tool(self,tool,record):
-        client = ActivityClient(self.args.control_socket, self.args.controller_mode)
+        client = ActivityClient(self.args.control_socket, self.args.controller_mode,
+                                timeout=self.args.control_timeout)
         self.clients.append(client)
         command = [sys.executable, str(HERE/'tool.py'), '--kind', self.args.tool_workload,
                    '--seconds', str(tool['duration_seconds'])]
@@ -271,6 +272,8 @@ def main():
     p.add_argument('--plan',type=Path,required=True)
     p.add_argument('--controller-mode',choices=['normal','defer','skip'],required=True)
     p.add_argument('--control-socket',type=Path)
+    p.add_argument('--control-timeout',type=float,default=10,
+                   help='Bounded scheduler acknowledgment wait; must be below the tool lease')
     p.add_argument('--url',default='http://127.0.0.1:30000')
     p.add_argument('--model',default='Qwen/Qwen3-0.6B')
     p.add_argument('--tool-workload',choices=['delay','stream'],default='delay')
@@ -319,7 +322,9 @@ def main():
     limit=settings.get('context_length')
     if not isinstance(limit,int) or any(t['prefix_len']+t['input_len']+t['output_len']>limit for s in plan['sessions'] for t in s['steps']):
         raise RuntimeError('Cannot verify all rounds fit server context length')
-    client=ActivityClient(args.control_socket,args.controller_mode)
+    if not 0 < args.control_timeout < 15:
+        p.error('--control-timeout must be positive and below the 15-second tool lease')
+    client=ActivityClient(args.control_socket,args.controller_mode,timeout=args.control_timeout)
     if client.initial['active_tool_ids'] or not client.initial.get('log_path'):
         raise RuntimeError('Use isolated controller with an event journal and no active tools')
     from transformers import AutoTokenizer
