@@ -12,7 +12,12 @@ PLAN="${1:?Usage: run-comparison.sh PLAN.json [delay|stream]}"
 KIND="${2:-delay}"
 case "$KIND" in delay|stream) ;; *) echo 'Tool workload must be delay or stream' >&2; exit 2;; esac
 source "$PROJECT/.venv/bin/activate"
-export STREAM_CONTROL_ROOT="${STREAM_CONTROL_ROOT:-${TMPDIR:-/tmp}/trace-aware-$USER-$SLURM_JOB_ID}"
+control_base="${STREAM_CONTROL_ROOT:-${TMPDIR:-/tmp}/trace-aware-$USER-$SLURM_JOB_ID}"
+mkdir -p "$control_base"
+# An owned server's forced shutdown can leave its socket inode behind. Use a
+# fresh private namespace per comparison instead of reusing or unlinking a
+# possibly live scheduler's socket on a subsequent invocation.
+export STREAM_CONTROL_ROOT="$(mktemp -d "$control_base/trace-XXXXXXXX")"
 export STREAM_RESULT_ROOT="${TRACE_RESULT_ROOT:-$PROJECT/scripts/results/tracelab-$SLURM_JOB_ID-$KIND}"
 mkdir -p "$STREAM_RESULT_ROOT"
 python - <<'PY'
