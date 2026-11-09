@@ -38,6 +38,11 @@ printf 'Control socket: %s\nController log: %s\n' "$SGLANG_STREAM_CONTROL_SOCKET
 # numactl still restricts every server worker to EXP_SERVER_CPUS.
 export OMP_PROC_BIND=FALSE
 unset OMP_PLACES
+# numactl below already binds the server and its children to the verified CPU
+# and memory node. PyTorch's NVML index helper does not resolve MIG UUIDs, so
+# SGLang's redundant automatic lookup can fail despite working CUDA arithmetic.
+export SGLANG_AUTO_NUMA_BIND=0
+export SGLANG_NUMA_BIND_V2=0
 backend_args=()
 if [[ -n "${EXP_ATTENTION_BACKEND:-}" ]]; then
   backend_args+=(--attention-backend "$EXP_ATTENTION_BACKEND")

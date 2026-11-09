@@ -71,6 +71,12 @@ the launcher preserve all assigned server cores; the prepared tools bind each
 worker to its disjoint subset. Arbitrary environment exports alone do not bind
 processes.
 
+The launcher disables SGLang's redundant automatic NUMA lookup: PyTorch's NVML
+index helper cannot resolve the allocated MIG UUID on this setup. The outer
+`numactl --physcpubind=... --membind=...` remains responsible for the verified
+placement, and children inherit it. This preserves Slurm's CUDA-visible device
+mapping rather than substituting an unallocated physical GPU index.
+
 ## 3. Prepare deterministic baseline and larger plans
 
 ```bash
