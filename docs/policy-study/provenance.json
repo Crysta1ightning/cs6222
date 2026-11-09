@@ -1,0 +1,470 @@
+{
+  "audit_date": "2026-11-09",
+  "original_job": "6824964",
+  "validated_configurations": 13,
+  "validated_measured_trials": 78,
+  "missing": [
+    "write_back--skip--all",
+    "write_back--defer--victim"
+  ],
+  "rejected": [
+    {
+      "configuration": "write_through--skip--all",
+      "path": "/home/hice1/wchen784/cs6222/scripts/results/pace-6824964-rtx_pro_6000_blackwell-numa0-t12/matrix/write_through--skip--all",
+      "reason": "Failed, empty or unsupported result: /tmp/policy-audit-3vr5l168/write_through--skip--all/stream/trace-skip-stream-1793899762680453713.json"
+    },
+    {
+      "configuration": "write_back--skip--all",
+      "path": "/home/hice1/wchen784/cs6222/scripts/results/pace-6824964-rtx_pro_6000_blackwell-numa0-t12/matrix-continuation/write_back--skip--all",
+      "reason": "write_back--skip--all/stream: expected 3 valid trials, found 0"
+    }
+  ],
+  "raw_result_roots": [
+    "scripts/results/pace-6824964-rtx_pro_6000_blackwell-numa0-t12/matrix",
+    "scripts/results/pace-6824964-rtx_pro_6000_blackwell-numa0-t12/matrix-continuation"
+  ],
+  "raw_files": [
+    {
+      "configuration": "write_through--normal--all",
+      "kind": "delay",
+      "filename": "trace-normal-delay-1793903483286949184.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "a781d573fd58e480520af50086f46db576374d3c56765228db21bcb8795609be"
+    },
+    {
+      "configuration": "write_through--normal--all",
+      "kind": "stream",
+      "filename": "trace-normal-stream-1793903785138449928.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "ed233e2c5bc70673bd04b01798936cd87f0a31fb9590bc4638dae8e718c8b3bd"
+    },
+    {
+      "configuration": "write_through--skip--all",
+      "kind": "delay",
+      "filename": "trace-skip-delay-1793901914448038593.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "c7bbc696723ec73fe3879b0db4b54cdc323a9f1c32791359c4838c66fef3ca54"
+    },
+    {
+      "configuration": "write_through--skip--all",
+      "kind": "stream",
+      "filename": "trace-skip-stream-1793902215341798759.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "f4248a72106ae459be2a64b03cf1f20c5241cf6b90590d0c3a49ce8d38d28b97"
+    },
+    {
+      "configuration": "write_through--defer--all",
+      "kind": "delay",
+      "filename": "trace-defer-delay-1793897118783076737.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "ae30ff7c2669d2934f3b9913fb22a6052de88c093efd57293bd6da3881be9e5d"
+    },
+    {
+      "configuration": "write_through--defer--all",
+      "kind": "stream",
+      "filename": "trace-defer-stream-1793897420097172281.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "736424c03c636fb0c150774d653e4b4ce6556f01752412aadf41e2ad38fa4645"
+    },
+    {
+      "configuration": "write_through--defer--victim",
+      "kind": "delay",
+      "filename": "trace-defer-delay-1793897901086110675.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "2701572ea37dcdbb3822f3a23ce372f14378a0bd3b9120fd1e479f4a9c63b9da"
+    },
+    {
+      "configuration": "write_through--defer--victim",
+      "kind": "stream",
+      "filename": "trace-defer-stream-1793898204995227302.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "e66291e25f2a36a081c65c273079632eb7bb9e7b58e654ecfa64affbf90dcfea"
+    },
+    {
+      "configuration": "write_through--defer--through_victim",
+      "kind": "delay",
+      "filename": "trace-defer-delay-1793905153266689074.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "e6bf6fe3e33ccc27da98effbcb6b76301b77afa3953fb9d9f61c2cf22dae1f4d"
+    },
+    {
+      "configuration": "write_through--defer--through_victim",
+      "kind": "stream",
+      "filename": "trace-defer-stream-1793905469152959767.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "bb6d4d99e15fbe9e885e66d7802178963e58ed38588de7bf9aae4178efdca606"
+    },
+    {
+      "configuration": "write_through_selective--normal--all",
+      "kind": "delay",
+      "filename": "trace-normal-delay-1793900356907293624.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "a6e8d73efdd6121bbb62d70f3397d8f1ed99402594a815a1a7d4b9d2458c9abe"
+    },
+    {
+      "configuration": "write_through_selective--normal--all",
+      "kind": "stream",
+      "filename": "trace-normal-stream-1793900657580510352.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "9a6d9772c6c09a2b66588ae8e7b0e1a37c7f6acaa6a72fba70c70a1f5490d156"
+    },
+    {
+      "configuration": "write_through_selective--skip--all",
+      "kind": "delay",
+      "filename": "trace-skip-delay-1793901138111404879.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "c6184e434cc41f316cf5fb4f4aedb7c5fd0adf6def8258396fb4bc9491e1cf34"
+    },
+    {
+      "configuration": "write_through_selective--skip--all",
+      "kind": "stream",
+      "filename": "trace-skip-stream-1793901437550061497.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "b3e38acbde4fc62cfc215e8b3b70cbc35053bbd0338e82e9ca5d6c65489f2f03"
+    },
+    {
+      "configuration": "write_through_selective--defer--all",
+      "kind": "delay",
+      "filename": "trace-defer-delay-1793902691871217888.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "ea4e74f75fdb697f8767e6f88069cdaecd3439569574d1a581faec05eea7121a"
+    },
+    {
+      "configuration": "write_through_selective--defer--all",
+      "kind": "stream",
+      "filename": "trace-defer-stream-1793902992850534476.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "0ae4c8dee06f30f79fd506f30ca0ad4e663b7cda8d6f75121babc346b9c10e35"
+    },
+    {
+      "configuration": "write_through_selective--defer--victim",
+      "kind": "delay",
+      "filename": "trace-defer-delay-1793896340464463401.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "39d1eb9d2ce65527a3ba5469a1807eb54842388d8e6b38454afc2e04eaf0c87f"
+    },
+    {
+      "configuration": "write_through_selective--defer--victim",
+      "kind": "stream",
+      "filename": "trace-defer-stream-1793896642394047380.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "8ca3a1d73ac0ed4a45d336ff453de7a88869f52feb92a722dc710a4619c9ce73"
+    },
+    {
+      "configuration": "write_through_selective--defer--through_victim",
+      "kind": "delay",
+      "filename": "trace-defer-delay-1793898683389417697.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "05f89f81c3058478716e0214ff5457be36b9587b69c6d8c4ac1ceccf8cc08462"
+    },
+    {
+      "configuration": "write_through_selective--defer--through_victim",
+      "kind": "stream",
+      "filename": "trace-defer-stream-1793898984890868375.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "413ee06b419d9731d00c77d9f41a27668e3dfe1b8dc9d848073bf84181916ecb"
+    },
+    {
+      "configuration": "write_back--normal--all",
+      "kind": "delay",
+      "filename": "trace-normal-delay-1793895554043468458.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "03d3bd944b286acd9c35def9eb6f6c1971cc7c4524161286f862a1684b763261"
+    },
+    {
+      "configuration": "write_back--normal--all",
+      "kind": "stream",
+      "filename": "trace-normal-stream-1793895858151585141.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "1f4f13dbce17d1cfd8264f2c84aadac2b58144672e7f2e7ce588a1e480b86604"
+    },
+    {
+      "configuration": "write_back--defer--all",
+      "kind": "delay",
+      "filename": "trace-defer-delay-1793894732876987516.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "5ef6bc9d43d00ebb58733e9812e7c6fed848c319b18ff575f1c7dbc259928dbc"
+    },
+    {
+      "configuration": "write_back--defer--all",
+      "kind": "stream",
+      "filename": "trace-defer-stream-1793895034591197304.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "b885d5c25bdd4147b0899713b230319a3b25f800e033da5da86ac9a44c4c5ce5"
+    },
+    {
+      "configuration": "write_back--defer--through_victim",
+      "kind": "delay",
+      "filename": "trace-defer-delay-1793904313833494629.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": null,
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "704627bda02d33665e76f0b65d4f2cd0641cc2b28fd038f4c0681831dffe847c"
+    },
+    {
+      "configuration": "write_back--defer--through_victim",
+      "kind": "stream",
+      "filename": "trace-defer-stream-1793904632860167415.json",
+      "plan_sha256": "a2525c9526f4d993ded5d127a0bbf9f57650808d74112c8020ea4381eb4b9680",
+      "stream_binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+      "runtime_source_sha256": {
+        "trace-replay/replay.py": "935bccaf62bedb8e7fcc2e38e4916f0df4d16a594a9bea686a93c2a9035a533a",
+        "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+        "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+        "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+        "memory-experiment/activity.py": "4a24dc9947c030a5f32647c6b6f7798d84e6d2fa72be454588194ced75b9b5da",
+        "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17",
+        "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728"
+      },
+      "raw_sha256": "8795fcdacb04ac9577b56590bfa665e65c689804feef8aa44453400aa34680f0"
+    }
+  ]
+}
