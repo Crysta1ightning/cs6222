@@ -6,7 +6,7 @@ the `scripts/` directory. Fresh checkouts can use:
 
 ```bash
 mkdir -p ~/cs6222
-git clone --branch experiment/stream-aware-backups https://github.com/Crysta1ightning/cs6222.git ~/cs6222/scripts
+git clone --branch experiment/policy-hierarchy-reproduction https://github.com/Crysta1ightning/cs6222.git ~/cs6222/scripts
 cd ~/cs6222
 ```
 
