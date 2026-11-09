@@ -65,7 +65,13 @@ in `sglang-patches/base-commit.txt`; current experiment implementation is based
 on SGLang 0.5.21 and PyTorch 2.13.0+cu130. Package versions and local differences
 are captured in the setup report and each run. No upstream SGLang push is needed.
 
-The worker build records source/binary hashes and compiler version. Keep the
+The worker uses two iterations per block, matching the successful reference
+replay. `STREAM_NTIMES=5 bash scripts/memory-experiment/build-worker.sh` explicitly
+selects a different block size; its longer quantum may fail the trace timing
+preflight. Use the same setting throughout a study.
+
+The worker build records source/binary hashes, compiler version and the exact
+compiler command (`build-command-worker.txt`). Keep the
 same binary for every configuration within a study. `OMP_PROC_BIND` settings in
 the launcher preserve all assigned server cores; the prepared tools bind each
 worker to its disjoint subset. Arbitrary environment exports alone do not bind

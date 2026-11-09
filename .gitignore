@@ -24,6 +24,7 @@ __pycache__/
 /memory-experiment/stream-worker
 /memory-experiment/build-sha256-*.txt
 /memory-experiment/compiler-version-*.txt
+/memory-experiment/build-command-*.txt
 
 # Local credentials
 .env
