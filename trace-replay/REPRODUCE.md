@@ -112,8 +112,14 @@ There are 27 eligible sessions in this deliberately filtered diagnostic subset.
 | Tool duration scaling / duration cap | 1 / uncapped | Identical |
 | User wait cap | 5 seconds | Identical |
 | Context limit / GPU KV pool, tokens | 4096 / 4096 | 16384 / 16384 |
-| Reserve / pending queue bound, tokens | 2048 / 4096 | 8192 / 16384 |
+| Reserve / configured pending limit, tokens | 2048 / 4096 | 8192 / 16384 |
+| Effective pending limit after half-pool safety cap | 2048 | 8192 |
 | Maximum deferral / host cache | 2 seconds / 4 GB | Same |
+
+The controller caps the configured pending-token limit at half the actual GPU
+KV capacity. `status.json` records requested settings; the replay JSON's
+`controller_initial` records effective limits. Use those effective limits when
+interpreting forced flushes.
 
 Use `python scripts/trace-replay/replay.py --controller-mode normal --plan
 scripts/results/policy-plans/baseline.json --dry-run` to inspect shapes/timing.

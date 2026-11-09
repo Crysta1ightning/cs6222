@@ -16,6 +16,11 @@ There are 15 configurations: three base policies (write-through, selective write
 
 Defaults deliberately constrain the GPU KV pool to 4096 tokens despite ample physical GPU memory. A 2048-token free-space reserve, 4096-token deferred-queue bound and two-second age bound apply equally to all configurations. These are cache-pressure diagnostics, not production-optimal settings. Override with --gpu-cache-tokens, --reserve-tokens and --max-pending-tokens. Do not compare results with different bounds as though only the controller changed.
 
+The pending-token argument above is a configured ceiling. The controller also
+caps it at half the actual GPU pool, making the baseline effective pending
+limit 2048 tokens. Read `controller_initial.max_pending_tokens` in raw replay
+JSON for the actual value; `status.json` records the requested argument.
+
 Victim selection preserves pending host-prefix dependencies and active-request locks. Through-victim includes the FIFO prefix through those dependencies. Required write-back copies and host-to-GPU restores proceed regardless of tool activity. Age and queue limits may flush more than a selected victim. Already submitted transfers are never cancelled. Write-back has no eager optional backup queue; its controller variants may be behaviorally equivalent. Activation counts must support any claim about queue-selection behavior.
 
 STREAM is synthetic memory traffic replacing tool computation; waiting tools preserve tool timing without that traffic. Neither executes the original tool commands. The selected public TraceLab sessions supply request structure and tool durations; scaled token lengths and synthetic token content remain limitations. Fresh-prompt experiments cannot establish a benefit from KV reuse; this replay also includes growing session prefixes and a reuse tail.

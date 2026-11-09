@@ -76,7 +76,8 @@ isolate physical DMA contention by itself.
   before measurement, with full validation and process cleanup afterwards.
 - Qwen/Qwen3-0.6B; SGLang 0.5.21/controller commit `0c6af068ab`; Triton attention,
   PyTorch sampling, seed 6222, CUDA graphs disabled, static fraction 0.30.
-- GPU KV pool 4096 tokens; reserve 2048; pending bound 4096; age bound 2 seconds;
+- GPU KV pool 4096 tokens; reserve 2048; configured pending bound 4096, effective
+  pending bound 2048 after the half-pool safety cap; age bound 2 seconds;
   context limit 4096; host KV cache 4 GB.
 - Four trace-derived sessions × four rounds, 12 tools, 20 requests including
   reuse tail, 8% tokens, output cap 32; original tool durations 2.418–72.709 s,
