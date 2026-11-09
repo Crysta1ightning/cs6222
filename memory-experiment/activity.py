@@ -32,11 +32,13 @@ def connect_bounded(channel, path, timeout, record):
 
 
 class ActivityClient:
-    def __init__(self, path, mode, timeout=2.0):
+    def __init__(self, path, mode, timeout=2.0, *, expected_pid=None):
         self.path, self.mode, self.timeout = str(path), mode, timeout
         self.events = []
-        self.pid = None
-        self.initial = self.rpc("STATUS")
+        self.pid = expected_pid
+        # A trial's parent client already verified the controller identity.
+        # START still verifies mode/PID and installs the lease before tool work.
+        self.initial = self.rpc("STATUS") if expected_pid is None else None
 
     def rpc(self, event, **fields):
         request = dict(event=event, request_id=uuid.uuid4().hex,

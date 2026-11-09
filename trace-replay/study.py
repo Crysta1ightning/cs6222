@@ -139,6 +139,8 @@ def run(args):
         placement={k:os.environ.get(k) for k in ['EXP_SERVER_CPUS','EXP_TOOL_CPUS','EXP_NUMA_NODE','EXP_GPU_UUID','CUDA_VISIBLE_DEVICES']},
         sources={str(p.relative_to(HERE.parent)):digest(p) for p in list(HERE.glob('*.py')) +
                  [HERE.parent/'memory-experiment/launch-stream-aware.sh', HERE.parent/'memory-experiment/stream-worker.c',
+                  HERE.parent/'memory-experiment/activity.py', HERE.parent/'memory-experiment/run.py',
+                  HERE.parent/'memory-experiment/compare.py',
                   HERE.parent/'backup-policy/persistent_stream.py']},
         controller_sources={str(p):digest(p) for p in [HERE.parents[1]/'sglang/python/sglang/srt'/name for name in
             ['managers/cache_controller.py','mem_cache/unified_radix_cache.py','mem_cache/stream_activity.py']]})

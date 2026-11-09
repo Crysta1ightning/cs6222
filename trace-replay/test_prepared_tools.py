@@ -70,6 +70,18 @@ class PreparedTests(unittest.TestCase):
         self.assertTrue(any(e['request']['event'] == 'TOOL_HEARTBEAT' for e in client.events))
         self.assertEqual(self.control.snapshot()['counters']['TOOL_EXPIRED'], 0)
 
+    def test_verified_controller_identity_preserves_restart_detection(self):
+        client = ActivityClient(self.socket, 'normal', expected_pid=os.getpid())
+        self.assertFalse(client.events)
+        client.rpc('TOOL_START', tool_id='known')
+        self.assertEqual(client.events[0]['request']['event'], 'TOOL_START')
+        client.end('known')
+        stale = ActivityClient(self.socket, 'normal', expected_pid=os.getpid()+1)
+        with self.assertRaisesRegex(RuntimeError, 'restarted'):
+            stale.rpc('TOOL_START', tool_id='stale')
+        client.end('stale')
+        self.assertFalse(self.control.snapshot()['active_tool_ids'])
+
     def test_same_stream_process_and_buffers_for_many_commands(self):
         with PreparedTools(self.args('stream')) as prepared:
             pid = prepared.workers[0].process.pid

@@ -77,6 +77,11 @@ the launcher preserve all assigned server cores; the prepared tools bind each
 worker to its disjoint subset. Arbitrary environment exports alone do not bind
 processes.
 
+Per-tool clients reuse the controller PID verified by the trial's parent client,
+avoiding an extra synchronous STATUS handshake in the tool-start interval.
+Every START/heartbeat/END still checks identity and mode; START must acknowledge
+the active lease before any tool work. Controller restart detection is retained.
+
 The launcher disables SGLang's redundant automatic NUMA lookup: PyTorch's NVML
 index helper cannot resolve the allocated MIG UUID on this setup. The outer
 `numactl --physcpubind=... --membind=...` remains responsible for the verified

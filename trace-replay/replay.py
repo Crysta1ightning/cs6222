@@ -127,12 +127,13 @@ def window(intervals, requests, events):
 
 
 class Replay:
-    def __init__(self, args, plan, pool, prepared=None):
+    def __init__(self, args, plan, pool, prepared=None, controller_pid=None):
         self.args, self.plan, self.pool = args, plan, pool
         self.cancel = threading.Event()
         self.records, self.tools, self.clients = [], [], []
         self.builders = {}
         self.prepared = prepared
+        self.controller_pid = controller_pid
         self.tool_executor = None
         self.stream_slots = threading.BoundedSemaphore(args.max_stream_processes)
         self.epoch = time.monotonic()
@@ -174,7 +175,7 @@ class Replay:
 
     def execute_tool(self,tool,record):
         client = ActivityClient(self.args.control_socket, self.args.controller_mode,
-                                timeout=self.args.control_timeout)
+                                timeout=self.args.control_timeout, expected_pid=self.controller_pid)
         self.clients.append(client)
         if self.prepared is not None:
             try:
@@ -427,7 +428,7 @@ def main():
             before=server.settle()
             initial_state=client.rpc('STATUS')
             offset=Path(client.initial['log_path']).stat().st_size
-            replay=Replay(args,plan,pool,prepared=prepared)
+            replay=Replay(args,plan,pool,prepared=prepared,controller_pid=client.pid)
             trial=dict(index=index+1,requests=replay.records,tools=replay.tools)
             data['trials'].append(trial)
             start=time.monotonic_ns()
