@@ -1,16 +1,26 @@
 diff --git a/python/sglang/srt/managers/cache_controller.py b/python/sglang/srt/managers/cache_controller.py
-index 115720b06f..ba136d29a7 100644
+index 115720b06f..65b40669d0 100644
 --- a/python/sglang/srt/managers/cache_controller.py
 +++ b/python/sglang/srt/managers/cache_controller.py
-@@ -819,10 +819,25 @@ class HiCacheController:
+@@ -819,13 +819,41 @@ class HiCacheController:
          self.start_writing()
          return host_indices
  
 -    def start_writing(self) -> None:
-+    def start_writing(self, force_reason: Optional[str] = None) -> None:
++    def start_writing(self, force_reason: Optional[str] = None,
++                      selected_node_ids: Optional[set[int]] = None) -> None:
          if len(self.write_queue) == 0:
              return
  
+-        op = CacheOperation.merge_ops(self.write_queue)
++        selected = self.write_queue if selected_node_ids is None else [
++            op for op in self.write_queue if any(n in selected_node_ids for n in op.node_ids)
++        ]
++        if not selected:
++            return
++        if selected_node_ids is not None and force_reason is None:
++            raise ValueError("Partial queue submission requires an explicit progress reason")
++
 +        activity = getattr(self, "stream_activity", None)
 +        reason = force_reason or "normal"
 +        if activity is not None:
@@ -25,25 +35,37 @@ index 115720b06f..ba136d29a7 100644
 +            )
 +            if reason is None:
 +                return
++            if reason == "select_victim":
++                self.activity_reclaim_callback()
++                return
 +
-         op = CacheOperation.merge_ops(self.write_queue)
++        op = CacheOperation.merge_ops(selected)
          host_indices, device_indices, pool_transfers = self._move_write_operation(op)
-         self.write_queue.clear()
-@@ -842,6 +857,8 @@ class HiCacheController:
+-        self.write_queue.clear()
++        selected_identity = {id(item) for item in selected}
++        self.write_queue[:] = [item for item in self.write_queue if id(item) not in selected_identity]
+ 
+         completion = self.l2_transfer_engine.submit_device_to_host(
+             self._l2_transfers(host_indices, device_indices, pool_transfers)
+@@ -842,6 +870,12 @@ class HiCacheController:
                  num_bytes=self._transfer_num_bytes(op),
              )
          )
 +        if activity is not None:
-+            activity.submitted(self.ack_write_queue[-1].num_bytes, len(op.device_indices), reason)
++            activity.submitted(self.ack_write_queue[-1].num_bytes, len(op.device_indices), reason,
++                               clear_pending=False)
++            activity.observe_pending(sum(len(item.device_indices) for item in self.write_queue),
++                                     sum(self._transfer_num_bytes(item) for item in self.write_queue),
++                                     len(self.write_queue))
  
      def _transfer_num_bytes(self, op: CacheOperation) -> int:
          return len(op.device_indices) * self.mem_pool_host.size_per_token
 diff --git a/python/sglang/srt/mem_cache/stream_activity.py b/python/sglang/srt/mem_cache/stream_activity.py
 new file mode 100644
-index 0000000000..5fa048c042
+index 0000000000..30a95bef04
 --- /dev/null
 +++ b/python/sglang/srt/mem_cache/stream_activity.py
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,282 @@
 +"""Experimental single-scheduler tool-activity gate; no bandwidth estimation.
 +
 +The UNIX listener runs in the *scheduler* process. Its thread changes only
@@ -66,9 +88,17 @@ index 0000000000..5fa048c042
 +
 +class ActivityController:
 +    def __init__(self, mode, *, max_tokens=4096, max_ops=256, max_age=2.0,
-+                 lease=15.0, max_tools=128, log_path=None, clock=time.monotonic):
++                 lease=15.0, max_tools=128, log_path=None, clock=time.monotonic,
++                 queue_policy="all", base_policy="write_through"):
 +        if mode not in ("normal", "defer", "skip"):
 +            raise ValueError("controller mode must be normal, defer, or skip")
++        if queue_policy not in ("all", "victim", "through_victim"):
++            raise ValueError("queue_policy must be all, victim or through_victim")
++        if mode != "defer" and queue_policy != "all":
++            raise ValueError("queue selection applies only to defer")
++        if base_policy not in ("write_through", "write_through_selective", "write_back"):
++            raise ValueError("unsupported base write policy")
++        self.queue_policy, self.base_policy = queue_policy, base_policy
 +        if min(max_tokens, max_ops, max_tools) < 1 or not all(
 +            math.isfinite(v) and v > 0 for v in (max_age, lease)
 +        ):
@@ -99,7 +129,8 @@ index 0000000000..5fa048c042
 +        self.listener = None
 +        self.stop = threading.Event()
 +        self.emit("CONTROLLER_START", mode=mode, pid=os.getpid(),
-+                  hostname=socket.gethostname(), job_id=os.getenv("SLURM_JOB_ID"))
++                  hostname=socket.gethostname(), job_id=os.getenv("SLURM_JOB_ID"),
++                  queue_policy=queue_policy, base_policy=base_policy)
 +
 +    def emit(self, event, **fields):
 +        with self.lock:
@@ -169,11 +200,13 @@ index 0000000000..5fa048c042
 +            events = [item for item in self.events if item["sequence"] > since][:256]
 +            oldest = self.events[0]["sequence"] if self.events else self.sequence + 1
 +            return dict(mode=self.mode, pid=os.getpid(), signal="tool_activity",
++                        queue_policy=self.queue_policy, base_policy=self.base_policy,
 +                        scheduler_placement=self.placement,
 +                        sequence=self.sequence, events=events,
 +                        events_truncated=since < oldest - 1,
 +                        active_tool_ids=sorted(self.active), lease_seconds=self.lease,
 +                        max_pending_tokens=self.max_tokens, max_pending_ops=self.max_ops,
++                        reserve_tokens=getattr(self, "reserve_tokens", None),
 +                        max_defer_seconds=self.max_age,
 +                        pending_tokens=self.pending_tokens, pending_bytes=self.pending_bytes,
 +                        pending_ops=self.pending_ops, counters=dict(self.counters),
@@ -215,6 +248,11 @@ index 0000000000..5fa048c042
 +            elif self.pending_tokens >= self.max_tokens or self.pending_ops >= self.max_ops:
 +                reason = "pending_limit"
 +            elif free_tokens < reserve_tokens:
++                if self.queue_policy != "all" and self.clock() - self.pending_since < self.max_age:
++                    # The cache selects an eligible pending victim without
++                    # borrowing live-request pins. Count an override only if
++                    # its selected batch is actually submitted.
++                    return "select_victim"
 +                reason = "gpu_pressure"
 +            elif self.clock() - self.pending_since >= self.max_age:
 +                reason = "maximum_age"
@@ -311,7 +349,7 @@ index 0000000000..5fa048c042
 +                self.log.close()
 +                self.log = None
 diff --git a/python/sglang/srt/mem_cache/unified_radix_cache.py b/python/sglang/srt/mem_cache/unified_radix_cache.py
-index 421a215722..4874179d5d 100644
+index 421a215722..fcef297ade 100644
 --- a/python/sglang/srt/mem_cache/unified_radix_cache.py
 +++ b/python/sglang/srt/mem_cache/unified_radix_cache.py
 @@ -2,6 +2,7 @@ from __future__ import annotations
@@ -379,7 +417,7 @@ index 421a215722..4874179d5d 100644
  
          self.tree_core.kv_events.record_all_cleared()
  
-@@ -513,6 +525,33 @@ class UnifiedRadixCache(BasePrefixCache):
+@@ -513,6 +525,42 @@ class UnifiedRadixCache(BasePrefixCache):
                      pool=PoolName.KV.value,
                  )
          self.load_back_threshold = 10
@@ -393,8 +431,8 @@ index 421a215722..4874179d5d 100644
 +                    or set(self.tree_components) != {ComponentType.FULL}
 +                    or self.host_memory_mode != "cache" or self.cache_controller is None
 +                    or self.sidecar_pool_specs or storage_backend is not None
-+                    or get_memory().hicache_write_policy != "write_through"):
-+                raise ValueError("STREAM controller requires single-TP/PP FULL-only HiCache, write_through, no sidecars or L3")
++                    or get_memory().hicache_write_policy not in ("write_through", "write_through_selective", "write_back")):
++                raise ValueError("STREAM controller requires single-TP/PP FULL-only HiCache, no sidecars or L3")
 +            from sglang.srt.mem_cache.stream_activity import ActivityController
 +
 +            capacity = self.token_to_kv_pool_allocator.size_full
@@ -405,20 +443,29 @@ index 421a215722..4874179d5d 100644
 +                max_age=float(os.getenv("SGLANG_STREAM_MAX_DEFER_SECONDS", "2")),
 +                lease=float(os.getenv("SGLANG_STREAM_LEASE_SECONDS", "15")),
 +                log_path=os.getenv("SGLANG_STREAM_CONTROLLER_LOG"),
++                queue_policy=os.getenv("SGLANG_STREAM_QUEUE_POLICY", "all"),
++                base_policy=get_memory().hicache_write_policy,
 +            )
++            if self.stream_activity.queue_policy != "all" and not hasattr(self.tree_core, "_node_arena"):
++                raise ValueError("Victim-aware queue selection currently requires Python UnifiedTreeCore")
 +            self.stream_activity.serve(control_socket)
 +            self.cache_controller.stream_activity = self.stream_activity
 +            self.cache_controller.activity_free_tokens = self.token_to_kv_pool_allocator.available_size
-+            self.cache_controller.activity_reserve_tokens = max(self.page_size, capacity // 8)
++            reserve = int(os.getenv("SGLANG_STREAM_RESERVE_TOKENS", str(max(self.page_size, capacity // 8))))
++            if not 0 <= reserve <= capacity:
++                raise ValueError("SGLANG_STREAM_RESERVE_TOKENS outside GPU pool capacity")
++            self.cache_controller.activity_reserve_tokens = reserve
++            self.stream_activity.reserve_tokens = reserve
++            self.cache_controller.activity_reclaim_callback = lambda: self._flush_activity_victim(reason="gpu_pressure")
          self.prefetch_stop_policy = get_memory().hicache_storage_prefetch_policy
  
          # Runtime attach/detach of the L3 backend (startup, admin API, atexit).
-@@ -611,6 +650,12 @@ class UnifiedRadixCache(BasePrefixCache):
+@@ -611,6 +659,12 @@ class UnifiedRadixCache(BasePrefixCache):
          """
          if self.disable:
              return EvictResult()
 +        if (self.stream_activity is not None and self.stream_activity.mode == "defer"
-+                and self.cache_controller.write_queue):
++                and self.stream_activity.queue_policy == "all" and self.cache_controller.write_queue):
 +            # Existing queued backups own GPU locks. Complete them before
 +            # selecting allocation victims, preserving reclaimable capacity.
 +            self.cache_controller.start_writing(force_reason="allocation_critical")
@@ -426,18 +473,110 @@ index 421a215722..4874179d5d 100644
  
          request_by_type = self._evict_request_by_type(params)
          available_size_targets = {
-@@ -705,6 +750,10 @@ class UnifiedRadixCache(BasePrefixCache):
+@@ -705,6 +759,10 @@ class UnifiedRadixCache(BasePrefixCache):
      ) -> EvictResult:
          if self.disable:
              return EvictResult()
 +        if (self.stream_activity is not None and self.stream_activity.mode == "defer"
-+                and self.cache_controller.write_queue):
++                and self.stream_activity.queue_policy == "all" and self.cache_controller.write_queue):
 +            self.cache_controller.start_writing(force_reason="allocation_critical")
 +            self.writing_check(write_back=True)
          start_time = time.perf_counter()
          tracker = {ct: 0 for ct in self.tree_components}
  
-@@ -1513,12 +1562,24 @@ class UnifiedRadixCache(BasePrefixCache):
+@@ -883,6 +941,12 @@ class UnifiedRadixCache(BasePrefixCache):
+                     node_id, made_progress = self._evict_device_next_node(ct, tracker)
+                     if node_id is None:
+                         if not made_progress:
++                            if ct == ComponentType.FULL and self._flush_activity_victim():
++                                # ACK completion unlocked new candidates. Restart the
++                                # ordinary heap; never evict through backup-held pins.
++                                self.tree_core.evict_device_end(ct)
++                                self.tree_core.evict_device_start(ct, request_cnt)
++                                continue
+                             break
+                     else:
+                         backup_kv = self._evict_device_leaf(node_id, tracker)
+@@ -913,6 +977,78 @@ class UnifiedRadixCache(BasePrefixCache):
+             finally:
+                 self.tree_core.evict_device_end(ct)
+ 
++    def _flush_activity_victim(self, reason: str = "allocation_critical") -> bool:
++        """Read-only victim planning; copy dependencies before releasing pins.
++
++        Called after the ordinary eviction heap exhausts reclaimable leaves,
++        or when pending pins prevent admission under GPU-space pressure.
++        Active-request pins are never subtracted from the live tree.
++        Queue extraction preserves the original host reservations, receipts and
++        acknowledgement IDs, including nodes split since they were queued.
++        """
++        activity = self.stream_activity
++        cc = self.cache_controller
++        if (activity is None or activity.mode != "defer" or activity.queue_policy == "all"
++                or not cc.write_queue):
++            return False
++        # Finish already-submitted transfers without submitting pending work.
++        # Their pins must not be mistaken for active-request pins below.
++        if self._finish_submitted_write_acks():
++            return True  # Refresh the heap with candidates unlocked by those ACKs first.
++        if reason == "gpu_pressure" and self.tree_core.evictable_device_leaves:
++            return False  # Ordinary eviction can already reclaim space.
++        queued_ids = {n for op in cc.write_queue for n in op.node_ids}
++        owners = {}
++        pending = {}
++        root = self.tree_core.root_node
++        for ack_id in queued_ids:
++            entry = self.ongoing_write_through.get(ack_id)
++            if entry is None or entry.lock_params is None:
++                raise RuntimeError("Queued optional backup lacks its protection receipt")
++            pending[ack_id] = entry
++            node = self.tree_core.node_by_id(entry.node_id)
++            while node is not root:
++                owners.setdefault(node.id, set()).add(ack_id)
++                node = node.parent
++        full = self.tree_core.components_by_type[ComponentType.FULL]
++        full._ensure_eviction_strategy()
++        candidates = []
++        for node_id, pins in owners.items():
++            node = self.tree_core.node_by_id(node_id)
++            value = node.component_data[ComponentType.FULL]
++            if (value.value is None or value.lock_ref != len(pins)
++                    or any(child.component_data[ComponentType.FULL].value is not None
++                           for child in node.children.values())):
++                continue
++            candidates.append(node)
++        if not candidates:
++            activity.emit("RECLAIM_NO_ELIGIBLE_VICTIM", pending_ops=len(cc.write_queue))
++            return False  # All remaining source leaves are needed by live requests.
++        victim = min(candidates, key=lambda node: (full.session_ref_eviction_strategy(node), node.id))
++        path = set()
++        node = victim
++        while node is not root:
++            path.add(node.id)
++            node = node.parent
++        required = set(owners[victim.id])
++        for ack_id, entry in pending.items():
++            if path.intersection(entry.publish_node_ids):
++                required.add(ack_id)  # Preserve a usable, completed host prefix.
++        if activity.queue_policy == "through_victim":
++            last = max(i for i, op in enumerate(cc.write_queue) if required.intersection(op.node_ids))
++            required = {n for op in cc.write_queue[:last+1] for n in op.node_ids}
++        selected = [op for op in cc.write_queue if required.intersection(op.node_ids)]
++        activity.emit("RECLAIM_SELECTION", queue_policy=activity.queue_policy,
++                      trigger=reason,
++                      victim_node_id=victim.id, selected_ack_ids=sorted(required),
++                      selected_ops=len(selected), queue_ops=len(cc.write_queue),
++                      selected_bytes=sum(cc._transfer_num_bytes(op) for op in selected),
++                      dependency_ops=len(required - owners[victim.id]))
++        cc.start_writing(force_reason=reason+"_"+activity.queue_policy,
++                         selected_node_ids=required)
++        self._finish_submitted_write_acks()
++        return True
++
+     def _tracks_write_through_unbacked_evictions(self) -> bool:
+         return (
+             self.host_memory_mode == "cache"
+@@ -1513,12 +1649,24 @@ class UnifiedRadixCache(BasePrefixCache):
              write_host, write_device, write_pools = (
                  self.cache_controller._move_write_operation(operation)
              )
@@ -462,7 +601,7 @@ index 421a215722..4874179d5d 100644
          except Exception:
              self.discard_kv_cache_backup(backup)
              raise
-@@ -1614,6 +1675,14 @@ class UnifiedRadixCache(BasePrefixCache):
+@@ -1614,6 +1762,14 @@ class UnifiedRadixCache(BasePrefixCache):
              # backed up. Skip only when no transfer remains.
              if device_value.numel() == 0 and not comp_xfers:
                  continue
@@ -477,7 +616,7 @@ index 421a215722..4874179d5d 100644
              sidecar_xfers = self._build_backup_sidecar(device_value, comp_xfers)
              host_indices = self._execute_kv_backup(
                  node_id, device_value, comp_xfers, sidecar_xfers
-@@ -1628,6 +1697,14 @@ class UnifiedRadixCache(BasePrefixCache):
+@@ -1628,6 +1784,14 @@ class UnifiedRadixCache(BasePrefixCache):
              self._track_write_through_node(
                  node_id, lock_params, publish_node_ids=publish_node_ids
              )
@@ -492,7 +631,7 @@ index 421a215722..4874179d5d 100644
              written = len(host_indices)
          return written
  
-@@ -3204,6 +3281,8 @@ class UnifiedRadixCache(BasePrefixCache):
+@@ -3204,6 +3368,8 @@ class UnifiedRadixCache(BasePrefixCache):
          """Best-effort auto-detach of the storage backend on process shutdown."""
          if self._storage_attachment is not None:
              self._storage_attachment.shutdown()
@@ -501,20 +640,46 @@ index 421a215722..4874179d5d 100644
  
      def clear_storage_backend(self) -> bool:
          if self._storage_attachment is None:
-@@ -3295,7 +3374,10 @@ class UnifiedRadixCache(BasePrefixCache):
+@@ -3295,16 +3461,12 @@ class UnifiedRadixCache(BasePrefixCache):
  
          if write_back:
              # Blocking: submit what is still queued, then wait for every ack.
 -            cc.start_writing()
+-            while self.ongoing_write_through:
+-                for ack in cc.ack_write_queue:
+-                    ack.finish_event.synchronize()
+-                    for ack_id in ack.node_ids:
+-                        if ack_id in self.ongoing_write_through:
+-                            self._finish_write_through_ack(ack_id)
+-                    self._log_write_ack_metrics(ack)
+-                cc.ack_write_queue.clear()
+-                assert len(self.ongoing_write_through) == 0
 +            if self.stream_activity is None:
 +                cc.start_writing()
 +            else:
 +                cc.start_writing(force_reason="allocation_critical")
-             while self.ongoing_write_through:
-                 for ack in cc.ack_write_queue:
-                     ack.finish_event.synchronize()
-@@ -3330,6 +3412,8 @@ class UnifiedRadixCache(BasePrefixCache):
++            self._finish_submitted_write_acks()
++            assert len(self.ongoing_write_through) == 0
+             return
  
+         if finish_count is None:
+@@ -3328,8 +3490,23 @@ class UnifiedRadixCache(BasePrefixCache):
+             self._log_write_ack_metrics(ack)
+             finish_count -= 1
+ 
++    def _finish_submitted_write_acks(self) -> int:
++        """Wait only for submitted batches; retain unsent operations and pins."""
++        cc = self.cache_controller
++        count = len(cc.ack_write_queue)
++        for ack in cc.ack_write_queue:
++            ack.finish_event.synchronize()
++            for ack_id in ack.node_ids:
++                if ack_id in self.ongoing_write_through:
++                    self._finish_write_through_ack(ack_id)
++            self._log_write_ack_metrics(ack)
++        cc.ack_write_queue.clear()
++        return count
++
      def _log_write_ack_metrics(self, ack: HiCacheAck) -> None:
          """Record D->H backup volume and duration for a completed write ack."""
 +        if self.stream_activity is not None:
