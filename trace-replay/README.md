@@ -53,19 +53,34 @@ execute their Rust code or require their large text corpus.
 
 Two tool surrogates are kept separate:
 
-| Workload | Actual subprocess | Interpretation |
+| Workload | Prepared runtime (default) | Interpretation |
 | --- | --- | --- |
-| `delay` (default) | Sleeps for the transformed duration | Trace timing and cache reuse without intentional memory stress |
-| `stream` | Repeats complete, validated STREAM invocations until the duration is reached | Synthetic memory-stress intervention; not the tools' original bandwidth |
+| `delay` (default) | Waits in a reusable replay thread; no subprocess | Trace timing and cache reuse without intentional memory stress |
+| `stream` | Sends timed commands to a warmed persistent STREAM process | Synthetic memory-stress intervention; not the tools' original bandwidth |
 
-Both signal START and wait for scheduler ACK before process launch, renew leases,
-and END after process termination, including failures/timeouts. All STREAM
-initialization and kernels are covered. STREAM never truncates a kernel to fit
-a duration. Its overruns are recorded; `--max-stream-processes 1` bounds aggregate
+Both signal START and wait for scheduler ACK before work begins, renew leases,
+and END after work finishes or is stopped and reaped on failure. STREAM buffers
+are allocated, first-touched, warmed and validated before measured trials, and
+remain allocated between commands. Idle OpenMP workers use passive waiting.
+The C worker timestamps its actual work; command round-trip time is recorded
+separately. Timed commands reset values inside the activity window to prevent
+overflow, then execute complete Copy/Scale/Add/Triad blocks. STREAM never truncates
+a kernel to fit a duration. Its overruns are recorded; `--max-stream-processes 1` bounds aggregate
 working-set memory and serializes competing STREAM surrogates. Queue delays are
 recorded, so this intervention does change trace timing. Increasing this limit
-can multiply the 1.5 GiB per-process footprint and OpenMP thread count. No bandwidth
+can multiply the 1.5 GiB per-process footprint and OpenMP thread count. Prepared
+workers receive disjoint subsets of the allowed tool CPUs; the runtime requires
+`threads * workers` allocated cores. For example, two four-thread workers need
+eight tool cores. The shell runner accepts `TRACE_MAX_STREAM_PROCESSES` and
+`TRACE_MAX_ACTIVE_SESSIONS`; `EXP_THREADS` is the thread count per worker. No bandwidth
 estimation or original tool-pressure classification is claimed.
+
+`--tool-runtime subprocess` (or `TRACE_TOOL_RUNTIME=subprocess` for the shell
+runner) retains the old per-tool process implementation. Comparisons reject
+mixing it with prepared results. All historical November 3/4 GPU results used
+the old process implementation; their data and conclusions are unchanged.
+The prepared runtime has CPU-only validation so far; no new GPU policy trials
+were run as part of this harness change.
 
 Replay uses a bounded `--control-timeout` of ten seconds by default, below the
 15-second tool lease, and records it as a comparison parameter. Busy UNIX listen
@@ -73,12 +88,100 @@ queues are retried only before an event is transmitted. Each comparison uses a
 new private socket directory; the scheduler journal stays on node-local storage
 and is archived to each mode's result directory when its server stops. STREAM's
 OpenMP core binding is disabled inside the server launcher so child workers can
-use the full assigned server CPU set.
+use the full assigned server CPU set. It is also disabled for the replay
+interpreter: Torch/OpenMP imports can otherwise pin replay to its first tool
+core, causing STREAM children to inherit a single-core mask. Each STREAM tool
+subprocess enables its own OpenMP binding within the full assigned tool CPU set.
 
 The controller cannot cancel a copy already submitted before a tool starts.
 In this closed-loop replay it can affect optional work still pending, or work
 from other sessions during tool activity. It may have little effect when those
 opportunities rarely overlap; that is a valid experimental outcome.
+
+## Check timing and the contention mechanism before more trials
+
+The original scaled plan has a median 9 ms tool duration, versus approximately
+270 ms of Python-process startup in the old harness. Audit a plan or an existing
+result without a GPU:
+
+```bash
+python scripts/trace-replay/timing.py --plan scripts/results/tracelab/plan.json
+# Optional: --result /path/to/trace-result.json --output /path/to/audit.json
+```
+
+Prepared replay records a complete STREAM-block calibration before measurement,
+and per-trial duration overruns and launch/queue delays. `--require-timing-fidelity`
+rejects a STREAM plan whose short intervals cannot absorb a full block within
+the 20% timing allowance, and rejects measured overruns/start lags beyond 20%
+(with a 2 ms absolute allowance). Passing functional checks alone does not imply
+faithful timing. Serialization can still stretch traces despite removing startup.
+For the shell runner, set `TRACE_REQUIRE_TIMING_FIDELITY=1` to require these
+checks. `TRACE_MAX_SECONDS` adjusts the per-trial timeout (default 600 seconds,
+maximum 3600); longer unscaled plans can require a larger explicit budget.
+
+To select longer sessions from the same pinned release, keep complete round
+chains and select on scaled median tool duration, for example:
+
+```bash
+python scripts/trace-replay/prepare.py prepare "$TRACE_DATA" \
+  --sessions 4 --rounds 8 --token-scale 0.05 --time-scale 1 \
+  --min-median-tool-seconds 0.5 --max-tool-seconds 0 \
+  --output scripts/results/tracelab-longer/plan.json
+```
+
+This changes the workload distribution and is recorded in `selection` and the
+rejection counts. It does not stretch individual tools to a minimum, discard
+individual rounds, or guarantee that every tool is long. Audit the resulting plan
+and retain short-tool warnings. Save new results separately from the old pilot.
+For a narrower timing diagnostic, `--min-tool-seconds 2 --max-parallel-tools 1`
+rejects entire candidate sessions with a shorter tool or overlapping tools within
+a round. Session chains and individual durations remain intact. This can select
+a very small, unrepresentative subset: report eligibility and rejection counts.
+Concurrent sessions still need enough workers to avoid queuing.
+
+The separate `contention_check.py` diagnostic defaults to a dry-run and does not
+import Torch or allocate anything:
+
+```bash
+python scripts/trace-replay/contention_check.py
+```
+
+When explicitly ready for a GPU mechanism check, use a fresh prepared allocation,
+stop the model server, build `bash scripts/memory-experiment/build-worker.sh`, then
+start with the following mechanism diagnostic:
+
+```bash
+OMP_PROC_BIND=FALSE numactl --membind="$EXP_NUMA_NODE" \
+  python scripts/trace-replay/contention_check.py --run \
+    --seconds 10 --copy-mib 64 --threads "$EXP_THREADS"
+```
+
+It compares the same prepared STREAM worker alone and with pinned GPU-to-host
+copies. Arrays, placement, buffers and warmup are held constant; worker threads,
+copy overlap and full numerical validation are checked. Continuous copying is
+an intentional stressor, not the trace's measured duty cycle; `--copy-period`
+can pace it. A positive result identifies a possible copy-contention mechanism,
+not an actual HiCache slowdown or a policy benefit. A later cache-off inference
+control is still needed to distinguish model-serving contention from cache-copy
+contention. Each invocation is one pair. `--order copies-first` reverses it;
+counterbalance repeated pairs before interpreting a small difference. Results
+include achieved copy bandwidth and summed CUDA copy intervals divided by the
+STREAM window. Those intervals are not exact physical DMA activity timestamps.
+`--copy-mib 4 --copy-period 0.4` is a sparse-load diagnostic near the old median
+batch size and average completion rate; it does not reproduce the actual burst
+sequence or transfer implementation.
+
+`cpu_timing_check.py --output-dir DIRECTORY` is a separate CPU-only harness
+experiment. Run it in an eight-core Slurm compute allocation, never on the login
+node. It discovers eight physical cores on one NUMA node, binds CPUs and memory,
+and compares delay timing, one eight-thread STREAM worker, and two disjoint
+four-thread workers. It measures short tools and simultaneous pairs, including
+full numerical validation and lease cleanup. CPU-only calibration is local to
+that host and does not substitute for GPU allocation or copy measurements.
+
+The server launcher accepts optional `EXP_ATTENTION_BACKEND`,
+`EXP_SAMPLING_BACKEND` and `EXP_RANDOM_SEED`. Save these with the result manifest;
+backend/seed changes define a different comparison configuration.
 
 ## Prepare once, without a GPU
 
@@ -155,8 +258,9 @@ bash scripts/trace-replay/run-comparison.sh \
   "$HOME/cs6222/scripts/results/tracelab/plan.json" stream
 ```
 
-This builds `stream-5` explicitly, leaving your normal 200-iteration STREAM build
-alone. The helper already generates plots. To regenerate them:
+This builds the persistent `stream-worker`, leaving your normal 200-iteration
+STREAM build alone. Legacy subprocess mode builds `stream-5` instead. The helper
+already generates plots. To regenerate them:
 
 ```bash
 python scripts/trace-replay/compare.py "$TRACE_RESULT_ROOT" \
@@ -166,7 +270,7 @@ python scripts/trace-replay/compare.py "$TRACE_RESULT_ROOT" \
 Or run against a manually launched server:
 
 ```bash
-numactl --physcpubind="$EXP_TOOL_CPUS" --membind="$EXP_NUMA_NODE" \
+OMP_PROC_BIND=FALSE numactl --physcpubind="$EXP_TOOL_CPUS" --membind="$EXP_NUMA_NODE" \
   python scripts/trace-replay/replay.py \
   --plan scripts/results/tracelab/plan.json \
   --controller-mode defer --control-socket "$STREAM_CONTROL_ROOT/defer.sock" \
@@ -185,7 +289,10 @@ measure TTFT or token-by-token latency; these remain unavailable.
 
 Three windows are separate:
 
-1. `tool`: union of actual subprocess lifetimes, with overlaps counted once.
+1. `tool`: union of actual work intervals, with overlaps counted once. Prepared
+   STREAM uses C-worker timestamps and delay uses replay wait timestamps;
+   legacy mode uses subprocess lifetimes. Worker preparation and final full-array
+   verification are outside measured trials and are recorded separately.
 2. `post_tool`: the final tool's exit through remaining trace inference, the
    fixed-count reuse tail, drain and accounting settle.
 3. `whole`: all trace execution, human gaps, tool work, subsequent inference,

@@ -17,13 +17,14 @@ def signature(data):
     config=data['replay_config']
     info=data['server_info'].get('server_args',data['server_info'])
     return dict(plan_sha256=data['plan_sha256'],tool_workload=data['tool_workload'],
+                write_policy=data.get('write_policy','write_through'),queue_policy=data.get('queue_policy','all'),
                 pool=data['token_pool_sha256'],binary=data.get('stream_binary_sha256'),
-                replay={k:config.get(k) for k in ['threads','max_active_sessions','max_stream_processes','tail_requests','control_timeout','request_timeout','tool_timeout','drain_timeout','max_seconds','model']},
+                replay={k:config.get(k) for k in ['threads','max_active_sessions','max_stream_processes','tail_requests','control_timeout','request_timeout','tool_timeout','drain_timeout','max_seconds','model','tool_runtime','require_timing_fidelity']},
                 hostname=data.get('hostname'),affinity=data.get('cpu_affinity'),
                 numa=data.get('numa',{}).get('stdout'),
-                server={k:info.get(k) for k in ['model_path','context_length','max_total_tokens','mem_fraction_static','hicache_size','hicache_ratio','hicache_write_policy','disable_cuda_graph','dtype','page_size','tp_size']},
-                bounds={k:data['controller_initial'].get(k) for k in ['max_pending_tokens','max_pending_ops','max_defer_seconds','lease_seconds','scheduler_placement']},
-                source_versions=data.get('source_versions'))
+                server={k:info.get(k) for k in ['model_path','context_length','max_total_tokens','mem_fraction_static','hicache_size','hicache_ratio','hicache_write_policy','disable_cuda_graph','dtype','page_size','tp_size','attention_backend','sampling_backend','random_seed']},
+                bounds={k:data['controller_initial'].get(k) for k in ['max_pending_tokens','max_pending_ops','max_defer_seconds','lease_seconds','reserve_tokens','scheduler_placement']},
+                source_versions=data.get('source_versions'),runtime_source_sha256=data.get('runtime_source_sha256'))
 
 
 def load(paths):
@@ -33,6 +34,11 @@ def load(paths):
         data=json.loads(path.read_text())
         if data.get('schema')!='tracelab-replay-v1' or data.get('error') or not data.get('trials') or any(t.get('error') for t in data['trials']):
             raise ValueError(f'Failed, empty or unsupported result: {path}')
+        if data.get('replay_config', {}).get('tool_runtime') == 'prepared':
+            final = data.get('tool_runtime_final')
+            expected = data['replay_config'].get('max_stream_processes', 1) if data.get('tool_workload') == 'stream' else 0
+            if not final or final.get('protocol') != 'prepared-tools-v1' or len(final.get('workers', [])) != expected or not all(w.get('full_validation') and w.get('reaped') for w in final.get('workers', [])):
+                raise ValueError(f'Prepared workers have not completed full validation and cleanup: {path}')
         current=signature(data)
         if reference is not None and reference!=current:
             differences=[k for k in reference if reference[k]!=current[k]]
@@ -66,6 +72,8 @@ def metrics(trial):
     result['tool.stream_median_triad_GB_per_second']=charts.stats([r['kernels']['Triad']['average_GB_per_second'] for r in stream_runs])[0]
     result['tool.surrogate_queue_seconds_total']=sum(t.get('surrogate_queue_seconds',0) for t in trial.get('tools',[]))
     result['tool.duration_overrun_seconds_total']=sum(t.get('duration_overrun_seconds',0) for t in trial.get('tools',[]))
+    for key in ['excessive_duration_overruns', 'excessive_start_lags', 'max_overrun_seconds', 'passed']:
+        result['tool.timing_fidelity.'+key] = trial.get('timing_fidelity', {}).get(key)
     return result
 
 
@@ -109,6 +117,9 @@ def main():
         median=charts.stats([t['windows']['whole']['seconds'] for t in trials])[0]
         restores=[t['transfer_counter_deltas'].get('sglang:load_back_bytes_total') for t in trials]
         print(f'{mode}: {len(trials)} trials, median whole {median:.3f}s; host restore bytes {restores}')
+        timing = [t['timing_fidelity'] for t in trials if 'timing_fidelity' in t]
+        if timing:
+            print(f'  Timing warnings: {sum(not t["passed"] for t in timing)}/{len(timing)} audited trials; do not treat functional completion as faithful trace timing.')
     print('Saved',args.output_dir/'summary.csv')
     print('Inspect tool and post_tool rows in summary.csv alongside whole-run time; cache hits alone do not prove host-cache reuse.')
 

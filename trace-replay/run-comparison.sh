@@ -10,6 +10,12 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT="$(cd "$HERE/../.." && pwd)"
 PLAN="${1:?Usage: run-comparison.sh PLAN.json [delay|stream]}"
 KIND="${2:-delay}"
+RUNTIME="${TRACE_TOOL_RUNTIME:-prepared}"
+case "$RUNTIME" in prepared|subprocess) ;; *) echo 'TRACE_TOOL_RUNTIME must be prepared or subprocess' >&2; exit 2;; esac
+timing_args=()
+if [[ "${TRACE_REQUIRE_TIMING_FIDELITY:-0}" == 1 ]]; then
+  timing_args+=(--require-timing-fidelity)
+fi
 case "$KIND" in delay|stream) ;; *) echo 'Tool workload must be delay or stream' >&2; exit 2;; esac
 source "$PROJECT/.venv/bin/activate"
 control_base="${STREAM_CONTROL_ROOT:-${TMPDIR:-/tmp}/trace-aware-$USER-$SLURM_JOB_ID}"
@@ -43,7 +49,11 @@ for cpu in server|tool:
     cores.add(identity)
 PY
 if [[ "$KIND" == stream ]]; then
-  bash "$PROJECT/scripts/memory-experiment/build.sh" 5
+  if [[ "$RUNTIME" == prepared ]]; then
+    bash "$PROJECT/scripts/memory-experiment/build-worker.sh"
+  else
+    bash "$PROJECT/scripts/memory-experiment/build.sh" 5
+  fi
 fi
 server_pid=''
 controller_journal=''
@@ -100,11 +110,16 @@ PY
     tail -n 60 "$STREAM_RESULT_ROOT/$mode/server.log"
     exit 1
   fi
-  numactl --physcpubind="$EXP_TOOL_CPUS" --membind="$EXP_NUMA_NODE" \
+  # Torch/OpenMP imports must not pin replay to its first tool core. Tool
+  # subprocesses set their own OpenMP binding after inheriting this full set.
+  OMP_PROC_BIND=FALSE numactl --physcpubind="$EXP_TOOL_CPUS" --membind="$EXP_NUMA_NODE" \
     python "$HERE/replay.py" --plan "$PLAN" --controller-mode "$mode" \
       --control-socket "$STREAM_CONTROL_ROOT/$mode.sock" --tool-workload "$KIND" \
+      --tool-runtime "$RUNTIME" \
+      --max-seconds "${TRACE_MAX_SECONDS:-600}" "${timing_args[@]}" \
       --threads "${EXP_THREADS:-1}" --trials "${TRACE_TRIALS:-3}" \
-      --max-active-sessions 4 --max-stream-processes 1 \
+      --max-active-sessions "${TRACE_MAX_ACTIVE_SESSIONS:-4}" \
+      --max-stream-processes "${TRACE_MAX_STREAM_PROCESSES:-1}" \
       --output-dir "$STREAM_RESULT_ROOT/$mode"
   stop_server
 done

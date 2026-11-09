@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import os
+import statistics
 from pathlib import Path
 import tempfile
 import urllib.request
@@ -130,7 +131,8 @@ def rows(path):
 
 def prepare(path, *, sessions=4, rounds=8, min_rounds=4, provider='any', seed=6222,
             token_scale=0.05, time_scale=0.1, output_cap=32, max_tool_seconds=5,
-            max_context=4096, human_wait_cap=5, session_spacing=0):
+            max_context=4096, human_wait_cap=5, session_spacing=0,
+            min_median_tool_seconds=0, min_tool_seconds=0, max_parallel_tools=0):
     """Keep the first consecutive rounds of each candidate, then hash-select sessions.
 
     Selection is independent of controller mode. Ineligible sessions are reported;
@@ -169,6 +171,25 @@ def prepare(path, *, sessions=4, rounds=8, min_rounds=4, provider='any', seed=62
         if not any(s['tools'] for s in steps) or not any(s['prefix_len'] for s in steps[1:]):
             rejected['no_tools_or_reuse'] += 1
             continue
+        durations = sorted(t['duration_seconds'] for s in steps for t in s['tools'])
+        if statistics.median(durations) < min_median_tool_seconds:
+            rejected['short_median_tool_duration'] += 1
+            continue
+        if min(durations) < min_tool_seconds:
+            rejected['short_individual_tool_duration'] += 1
+            continue
+        peak = 0
+        for step in steps:
+            events = [(t['offset_seconds'], 1) for t in step['tools'] if t['duration_seconds'] > 0]
+            events += [(t['offset_seconds']+t['duration_seconds'], -1)
+                       for t in step['tools'] if t['duration_seconds'] > 0]
+            active = 0
+            for _, delta in sorted(events, key=lambda e: (e[0], e[1])):
+                active += delta
+                peak = max(peak, active)
+        if max_parallel_tools and peak > max_parallel_tools:
+            rejected['excess_parallel_tools'] += 1
+            continue
         for step, next_step in zip(steps, steps[1:]):
             # Only user-driven gaps are human waits; never label them tool activity.
             if next_step['first_input_event_type'] == 'user_message':
@@ -200,7 +221,9 @@ def prepare(path, *, sessions=4, rounds=8, min_rounds=4, provider='any', seed=62
                                 session_spacing_seconds=session_spacing),
                 prefix_model='reported cached-prefix length reconstructed with synthetic token IDs; not original token identity or guaranteed hits',
                 timing_model='closed-loop local generation; tool offsets relative to first emitted tool after full response; synthetic session arrivals',
-                sessions=selected)
+                selection=dict(min_median_tool_seconds=min_median_tool_seconds,
+                    min_tool_seconds=min_tool_seconds, max_parallel_tools=max_parallel_tools,
+                    changes_workload_distribution=bool(min_median_tool_seconds or min_tool_seconds or max_parallel_tools)), sessions=selected)
 
 
 def main():
@@ -216,6 +239,12 @@ def main():
     for name, default in [('token-scale',0.05),('time-scale',0.1),('max-tool-seconds',5),('human-wait-cap',5),('session-spacing',0)]:
         q.add_argument('--'+name, type=float, default=default)
     q.add_argument('--provider', choices=['any','claude','codex'], default='any')
+    q.add_argument('--min-median-tool-seconds', type=float, default=0,
+                   help='Select complete sessions with longer scaled tools; never floor individual durations')
+    q.add_argument('--min-tool-seconds', type=float, default=0,
+                   help='Reject complete sessions containing any shorter scaled tool')
+    q.add_argument('--max-parallel-tools', type=int, default=0,
+                   help='Maximum intrinsic within-round tool overlap; zero disables this session filter')
     args = p.parse_args()
     if args.command == 'fetch':
         download(args.output)
@@ -225,7 +254,7 @@ def main():
             p.error('sessions 1..64; 2 <= min-rounds <= rounds <= 10000')
         if not 0 < args.token_scale <= 1 or not 0 < args.time_scale <= 100:
             p.error('token-scale must be in (0,1]; time-scale in (0,100]')
-        if any(not math.isfinite(v) or v < 0 for v in [args.max_tool_seconds,args.human_wait_cap,args.session_spacing]) or args.output_cap < 0 or args.max_context < 2:
+        if any(not math.isfinite(v) or v < 0 for v in [args.max_tool_seconds,args.human_wait_cap,args.session_spacing,args.min_median_tool_seconds,args.min_tool_seconds]) or args.max_parallel_tools < 0 or args.output_cap < 0 or args.max_context < 2:
             p.error('invalid cap, spacing, or context')
         options = vars(args).copy()
         for key in ['command','source','output']:

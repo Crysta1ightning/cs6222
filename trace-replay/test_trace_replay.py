@@ -75,6 +75,22 @@ class TraceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'missing'):
             prepare.convert(row,1,1,0,0)
 
+    def test_longer_tool_selection_keeps_complete_sessions_without_flooring(self):
+        rows = source_rows()
+        for row in rows:
+            if row['session_id'] == 'b':
+                row['tools'][0]['result_at'] = '2026-06-01T00:00:01.100Z'
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'source.jsonl'
+            path.write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            plan = prepare.prepare(path, sessions=1, min_rounds=2, rounds=2,
+                token_scale=1, time_scale=1, max_context=64, min_median_tool_seconds=.05)
+        self.assertEqual(plan['sessions'][0]['session_id'], 'b')
+        self.assertEqual(len(plan['sessions'][0]['steps']), 2)
+        self.assertAlmostEqual(plan['sessions'][0]['steps'][0]['tools'][0]['duration_seconds'], .1, places=5)
+        self.assertEqual(plan['rejected_sessions']['short_median_tool_duration'], 1)
+        self.assertTrue(plan['selection']['changes_workload_distribution'])
+
     def test_human_wait_is_separate_from_tools(self):
         rows=source_rows()
         rows[1]['first_input_event_type']='user_message'
@@ -85,6 +101,26 @@ class TraceTests(unittest.TestCase):
         session=next(s for s in plan['sessions'] if s['session_id']=='a')
         self.assertAlmostEqual(session['steps'][0]['original_human_wait_after_seconds'],10,places=4)
         self.assertEqual(session['steps'][0]['human_wait_after_seconds'],0.5)
+
+    def test_minimum_tool_and_parallelism_filters_reject_whole_sessions(self):
+        rows = source_rows()
+        for row in rows:
+            if row['session_id'] == 'b':
+                row['tools'][0]['result_at'] = '2026-06-01T00:00:01.100Z'
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'source.jsonl'
+            path.write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            plan = prepare.prepare(path, sessions=1, rounds=2, min_rounds=2,
+                token_scale=1, time_scale=1, max_context=64, min_tool_seconds=.05)
+            self.assertEqual(plan['sessions'][0]['session_id'], 'b')
+            self.assertEqual(plan['rejected_sessions']['short_individual_tool_duration'], 1)
+            rows[-1]['tools'].append(dict(tool_name='Read', emitted_at='2026-06-01T00:00:01.010Z',
+                result_at='2026-06-01T00:00:01.090Z'))
+            path.write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            plan = prepare.prepare(path, sessions=1, rounds=2, min_rounds=2,
+                token_scale=1, time_scale=1, max_context=64, max_parallel_tools=1)
+            self.assertEqual(plan['sessions'][0]['session_id'], 'a')
+            self.assertEqual(plan['rejected_sessions']['excess_parallel_tools'], 1)
 
     def test_exact_generated_output_carried_into_prefix(self):
         builder=replay.PromptBuilder(list(range(10,100)),118)
@@ -128,6 +164,8 @@ class TraceTests(unittest.TestCase):
         self.assertNotEqual(compare.signature(a),compare.signature(b))
         b=copy.deepcopy(a);b['tool_workload']='stream'
         self.assertNotEqual(compare.signature(a),compare.signature(b))
+        b=copy.deepcopy(a);b['replay_config']['tool_runtime']='prepared'
+        self.assertNotEqual(compare.signature(a),compare.signature(b))
 
     def test_prefix_hit_does_not_claim_host_restore(self):
         trial=dict(requests=[dict(prompt_tokens=20,cached_tokens=10,output_tokens=2)],
@@ -136,6 +174,16 @@ class TraceTests(unittest.TestCase):
         self.assertEqual(trial['server_prefix_hit_rate'],0.5)
         self.assertFalse(trial['host_restore_measurement_available'])
         self.assertFalse(trial['host_restore_observed'])
+
+    def test_prepared_results_require_full_validation_and_cleanup(self):
+        data = dict(schema='tracelab-replay-v1', trials=[{}], replay_config=dict(tool_runtime='prepared'))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'trace.json'
+            for final in [None, dict(workers=[dict(full_validation=False, reaped=True)])]:
+                data['tool_runtime_final'] = final
+                path.write_text(json.dumps(data))
+                with self.assertRaisesRegex(ValueError, 'full validation'):
+                    compare.load([path])
 
 
 class LocalReplayTests(unittest.TestCase):

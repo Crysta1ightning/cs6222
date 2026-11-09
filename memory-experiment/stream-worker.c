@@ -20,6 +20,12 @@ static uint64_t now_ns(void) {
 static double expected_a = 2., expected_b = 2., expected_c = 0.;
 static int iterations = 0;
 
+static void reset_arrays(void) {
+    #pragma omp parallel for
+    for (ssize_t j=0; j<STREAM_ARRAY_SIZE; j++) { a[j]=2.; b[j]=2.; c[j]=0.; }
+    expected_a=2.; expected_b=2.; expected_c=0.; iterations=0;
+}
+
 static void run_kernels(double timings[4][NTIMES]) {
     for (int k = 0; k < NTIMES; k++) {
         double start = mysecond();
@@ -59,14 +65,13 @@ static int validate(int full) {
 
 int main(void) {
     double timings[4][NTIMES];
-    #pragma omp parallel for
-    for (ssize_t j=0; j<STREAM_ARRAY_SIZE; j++) { a[j]=2.; b[j]=2.; c[j]=0.; }
+    reset_arrays();
     run_kernels(timings);
     if (!validate(1)) return 2;
-    printf("{\"event\":\"ready\",\"array_elements\":%llu,\"iterations_per_round\":%d}\n",
+    printf("{\"event\":\"ready\",\"protocol\":\"timed-stream-v1\",\"commands\":[\"GO\",\"RUN\",\"WORK\"],\"full_validation\":true,\"array_elements\":%llu,\"iterations_per_round\":%d}\n",
            (unsigned long long)STREAM_ARRAY_SIZE, NTIMES);
     fflush(stdout);
-    char command[16];
+    char command[128];
     while (fgets(command,sizeof(command),stdin)) {
         if (!strcmp(command,"QUIT\n")) {
             int valid=validate(1);
@@ -74,20 +79,36 @@ int main(void) {
             fflush(stdout);
             return valid?0:2;
         }
-        if (strcmp(command,"GO\n") || iterations+NTIMES>200) return 3;
+        double seconds=0.; char extra;
+        int timed=!strncmp(command,"RUN ",4);
+        int fixed=!strncmp(command,"WORK ",5), target_rounds=0;
+        if (timed) {
+            if (sscanf(command+4,"%lf %c",&seconds,&extra)!=1 || !isfinite(seconds) || seconds<0. || seconds>3600.) return 3;
+        } else if (fixed) {
+            if (sscanf(command+5,"%d %c",&target_rounds,&extra)!=1 || target_rounds<1 || target_rounds>100000) return 3;
+        } else if (strcmp(command,"GO\n") || iterations+NTIMES>200) return 3;
         uint64_t start=now_ns();
         printf("{\"event\":\"started\",\"start_ns\":%llu}\n",(unsigned long long)start);
         fflush(stdout);
-        run_kernels(timings);
+        int valid=1, rounds=0;
+        double totals[4]={0.,0.,0.,0.};
+        do {
+            /* Timed commands can run indefinitely without overflowing doubles.
+             * Reset traffic is inside the activity window; allocation and the
+             * initial first-touch/warmup remain outside measured intervals. */
+            if (timed || fixed) reset_arrays();
+            run_kernels(timings);
+            valid=validate(0);
+            for (int op=0;op<4;op++)
+                for (int k=1;k<NTIMES;k++) totals[op]+=timings[op][k];
+            rounds++;
+        } while (valid && ((timed && (now_ns()-start)/1.e9<seconds) || (fixed && rounds<target_rounds)));
         uint64_t end=now_ns();
-        int valid=validate(0);
-        printf("{\"event\":\"done\",\"start_ns\":%llu,\"end_ns\":%llu,\"sample_valid\":%s,\"kernels\":{",
-               (unsigned long long)start,(unsigned long long)end,valid?"true":"false");
+        printf("{\"event\":\"done\",\"start_ns\":%llu,\"end_ns\":%llu,\"sample_valid\":%s,\"rounds\":%d,\"target_seconds\":%.12g,\"target_rounds\":%d,\"kernels\":{",
+               (unsigned long long)start,(unsigned long long)end,valid?"true":"false",rounds,seconds,target_rounds);
         const char *names[]={"Copy","Scale","Add","Triad"};
         for (int op=0;op<4;op++) {
-            double sum=0.;
-            for (int k=1;k<NTIMES;k++) sum+=timings[op][k];
-            double avg=sum/(NTIMES-1);
+            double avg=totals[op]/((NTIMES-1)*rounds);
             printf("%s\"%s\":{\"average_seconds\":%.12g,\"average_GB_per_second\":%.12g}",
                    op?",":"",names[op],avg,bytes[op]/avg/1.e9);
         }

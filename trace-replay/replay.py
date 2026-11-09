@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import random
+import signal
 import socket
 import statistics
 import sys
@@ -18,6 +19,8 @@ SCRIPTS = HERE.parent
 sys.path.insert(0, str(SCRIPTS / 'memory-experiment'))
 from activity import ActivityClient, run_command
 from run import Server, command_output, counter_delta, source_version
+from prepared_tools import PreparedTools
+from timing import plan_timing, timing_fidelity
 
 
 def sha(value):
@@ -124,11 +127,13 @@ def window(intervals, requests, events):
 
 
 class Replay:
-    def __init__(self, args, plan, pool):
+    def __init__(self, args, plan, pool, prepared=None):
         self.args, self.plan, self.pool = args, plan, pool
         self.cancel = threading.Event()
         self.records, self.tools, self.clients = [], [], []
         self.builders = {}
+        self.prepared = prepared
+        self.tool_executor = None
         self.stream_slots = threading.BoundedSemaphore(args.max_stream_processes)
         self.epoch = time.monotonic()
         self.deadline = self.epoch + args.max_seconds
@@ -171,6 +176,16 @@ class Replay:
         client = ActivityClient(self.args.control_socket, self.args.controller_mode,
                                 timeout=self.args.control_timeout)
         self.clients.append(client)
+        if self.prepared is not None:
+            try:
+                record['result'] = self.prepared.execute(tool, record, client, self.cancel,
+                    min(self.args.tool_timeout, max(0.001, self.deadline-time.monotonic())))
+                record['actual_seconds'] = (record['end_ns']-record['start_ns'])/1e9
+                record['duration_overrun_seconds'] = max(0, record['actual_seconds']-tool['duration_seconds'])
+                record['launch_lag_seconds'] = (record['start_ns']-record['planned_start_ns'])/1e9
+                return
+            finally:
+                record['activity_events'] = client.events
         command = [sys.executable, str(HERE/'tool.py'), '--kind', self.args.tool_workload,
                    '--seconds', str(tool['duration_seconds'])]
         if self.args.tool_workload == 'stream':
@@ -216,16 +231,21 @@ class Replay:
                 self.request(sid, step, builder)
                 epoch = time.monotonic()
                 if step['tools']:
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=len(step['tools'])) as executor:
-                        jobs = [executor.submit(self.tool,tool,epoch,sid,step['round_index']) for tool in step['tools']]
-                        for job in concurrent.futures.as_completed(jobs):
-                            job.result()
+                    jobs = [self.tool_executor.submit(self.tool,tool,epoch,sid,step['round_index']) for tool in step['tools']]
+                    for job in concurrent.futures.as_completed(jobs):
+                        job.result()
                 self.wait_until(time.monotonic()+step['human_wait_after_seconds'])
         except BaseException:
             self.cancel.set()
             raise
 
     def run(self):
+        # Reuse tool threads across rounds; sleeping surrogates need no process.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=128) as executor:
+            self.tool_executor = executor
+            return self._run()
+
+    def _run(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.args.max_active_sessions) as executor:
             jobs = [executor.submit(self.session,s) for s in self.plan['sessions']]
             for job in concurrent.futures.as_completed(jobs):
@@ -271,6 +291,8 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--plan',type=Path,required=True)
     p.add_argument('--controller-mode',choices=['normal','defer','skip'],required=True)
+    p.add_argument('--write-policy',choices=['write_through','write_through_selective','write_back'],default='write_through')
+    p.add_argument('--queue-policy',choices=['all','victim','through_victim'],default='all')
     p.add_argument('--control-socket',type=Path)
     p.add_argument('--control-timeout',type=float,default=10,
                    help='Bounded scheduler acknowledgment wait; must be below the tool lease')
@@ -278,6 +300,11 @@ def main():
     p.add_argument('--model',default='Qwen/Qwen3-0.6B')
     p.add_argument('--tool-workload',choices=['delay','stream'],default='delay')
     p.add_argument('--stream-binary',type=Path,default=SCRIPTS/'memory-experiment/stream-5')
+    p.add_argument('--tool-runtime', choices=['prepared', 'subprocess'], default='prepared',
+                   help='prepared reuses workers/buffers; subprocess reproduces the legacy harness')
+    p.add_argument('--stream-worker', type=Path, default=SCRIPTS/'memory-experiment/stream-worker')
+    p.add_argument('--require-timing-fidelity', action='store_true',
+                   help='Fail instead of accepting stretched/queued tool intervals')
     p.add_argument('--threads',type=int,default=1)
     p.add_argument('--max-stream-processes',type=int,default=1,
                    help='bound simultaneous STREAM processes; queue delays are recorded (stress intervention only)')
@@ -300,14 +327,17 @@ def main():
         p.error('Plan may exceed controller limit of 128 overlapping tool IDs; reduce concurrency')
     if any(not math.isfinite(t) or not 0 < t <= 3600 for t in [args.request_timeout,args.tool_timeout,args.drain_timeout,args.max_seconds]):
         p.error('timeouts must be finite and in (0,3600]')
-    if args.tool_workload=='stream' and not args.dry_run and not args.stream_binary.is_file():
-        p.error('Build a short STREAM binary: bash memory-experiment/build.sh 5')
+    if args.tool_workload=='stream' and not args.dry_run:
+        binary = args.stream_worker if args.tool_runtime == 'prepared' else args.stream_binary
+        if not binary.is_file():
+            p.error('Build STREAM: bash scripts/memory-experiment/build-worker.sh (prepared) or build.sh 5 (legacy)')
     plan_hash=sha(plan)
     if args.dry_run:
         print(json.dumps(dict(plan_sha256=plan_hash,sessions=len(plan['sessions']),
               rounds=sum(len(s['steps']) for s in plan['sessions']),
               tools=sum(len(t['tools']) for s in plan['sessions'] for t in s['steps']),
               max_context=max(t['prefix_len']+t['input_len']+t['output_len'] for s in plan['sessions'] for t in s['steps']),
+              tool_runtime=args.tool_runtime,timing=plan_timing(plan),
               transforms=plan['transforms']),indent=2))
         return
     if not args.control_socket:
@@ -315,8 +345,8 @@ def main():
     server=Server(args.url)
     info=server.get('/server_info').json()
     settings=info.get('server_args',info)
-    if not settings.get('enable_hierarchical_cache') or settings.get('hicache_write_policy')!='write_through' or not settings.get('enable_metrics'):
-        raise RuntimeError('Require HiCache write_through and metrics')
+    if not settings.get('enable_hierarchical_cache') or settings.get('hicache_write_policy')!=args.write_policy or not settings.get('enable_metrics'):
+        raise RuntimeError('Require HiCache with the requested write policy and metrics')
     if settings.get('model_path') != args.model:
         raise RuntimeError('Server model_path differs from --model')
     limit=settings.get('context_length')
@@ -325,6 +355,10 @@ def main():
     if not 0 < args.control_timeout < 15:
         p.error('--control-timeout must be positive and below the 15-second tool lease')
     client=ActivityClient(args.control_socket,args.controller_mode,timeout=args.control_timeout)
+    if client.initial.get('queue_policy', 'all') != args.queue_policy:
+        raise RuntimeError('Controller queue policy differs from the requested configuration')
+    if client.initial.get('base_policy', 'write_through') != args.write_policy:
+        raise RuntimeError('Controller base policy differs from the server/replay configuration')
     if client.initial['active_tool_ids'] or not client.initial.get('log_path'):
         raise RuntimeError('Use isolated controller with an event journal and no active tools')
     from transformers import AutoTokenizer
@@ -335,14 +369,18 @@ def main():
     args.output_dir.mkdir(parents=True,exist_ok=True)
     output=args.output_dir/f'trace-{args.controller_mode}-{args.tool_workload}-{time.time_ns()}.json'
     data=dict(schema='tracelab-replay-v1',plan=plan,plan_sha256=plan_hash,controller_mode=args.controller_mode,
-              write_policy='write_through',tool_workload=args.tool_workload,
+              write_policy=args.write_policy,queue_policy=args.queue_policy,tool_workload=args.tool_workload,
               replay_config={k:str(v) if isinstance(v,Path) else v for k,v in vars(args).items()},
               hostname=socket.gethostname(),job_id=os.environ.get('SLURM_JOB_ID'),
               cpu_affinity=sorted(os.sched_getaffinity(0)),numa=command_output(['numactl','--show']),
               gpu_topology=command_output(['nvidia-smi','topo','-m']),
               source_versions={'scripts':source_version(SCRIPTS),'sglang':source_version(SCRIPTS.parent/'sglang')},
+              runtime_source_sha256={str(path.relative_to(SCRIPTS)): hashlib.sha256(path.read_bytes()).hexdigest()
+                  for path in [HERE/'replay.py', HERE/'tool.py', HERE/'prepared_tools.py', HERE/'timing.py',
+                               SCRIPTS/'memory-experiment/activity.py', SCRIPTS/'backup-policy/persistent_stream.py',
+                               SCRIPTS/'memory-experiment/stream-worker.c']},
               token_pool_sha256=sha(pool),server_info=info,controller_initial=client.initial,
-              stream_binary_sha256=hashlib.sha256(args.stream_binary.read_bytes()).hexdigest() if args.tool_workload=='stream' else None,
+              stream_binary_sha256=hashlib.sha256((args.stream_worker if args.tool_runtime=='prepared' else args.stream_binary).read_bytes()).hexdigest() if args.tool_workload=='stream' else None,
               trials=[],limitations=[
                   'Sanitized trace shapes with synthetic token IDs; no original prompt, tool execution, semantic correctness, or original cache identity.',
                   'Reported prefix counts model potential reuse; actual hits and H2D restores must be measured independently.',
@@ -353,6 +391,15 @@ def main():
                   'Scaled/capped short-session subset with synthetic arrivals is not representative of the full trace distribution.'])
     def persist():
         output.write_text(json.dumps(data,indent=2)+'\n')
+    prepared = None
+    replay = None
+    previous_handlers = {sig: signal.getsignal(sig) for sig in [signal.SIGINT, signal.SIGTERM]}
+    def interrupted(signum, frame):
+        if replay is not None:
+            replay.cancel.set()
+        raise KeyboardInterrupt(f'Replay interrupted by signal {signum}')
+    for sig in previous_handlers:
+        signal.signal(sig, interrupted)
     try:
         # Prefix probe and warmup outside every measured interval. Require cache
         # reporting instead of substituting a measured zero for missing fields.
@@ -365,6 +412,14 @@ def main():
         largest=max((t for s in plan['sessions'] for t in s['steps']),key=lambda t:t['prefix_len']+t['input_len'])
         _,data['shape_warmup']=generate(args.url,random.Random(209).choices(pool,k=largest['prefix_len']+largest['input_len']),
                                        largest['output_len'],args.request_timeout)
+        if args.tool_runtime == 'prepared':
+            prepared = PreparedTools(args).__enter__()
+            data['tool_runtime_initial'] = prepared.initial
+            quantum = max((w['minimum_round_seconds'] for w in prepared.initial['workers']), default=None)
+            data['timing_preflight'] = plan_timing(plan, quantum)
+            if args.require_timing_fidelity and quantum is not None and any(
+                    t['duration_seconds'] < quantum / 0.2 for s in plan['sessions'] for step in s['steps'] for t in step['tools']):
+                raise RuntimeError('Trace intervals too short for the prepared STREAM quantum; select longer tools or use delay')
         for index in range(args.trials):
             client.wait_drained(args.drain_timeout)
             server.get('/flush_cache')
@@ -372,7 +427,7 @@ def main():
             before=server.settle()
             initial_state=client.rpc('STATUS')
             offset=Path(client.initial['log_path']).stat().st_size
-            replay=Replay(args,plan,pool)
+            replay=Replay(args,plan,pool,prepared=prepared)
             trial=dict(index=index+1,requests=replay.records,tools=replay.tools)
             data['trials'].append(trial)
             start=time.monotonic_ns()
@@ -397,8 +452,11 @@ def main():
                                       'post_tool':window([(last_end,end)],replay.records,events),
                                       'whole':window([(start,end)],replay.records,events)})
                 summarize_trial(trial)
+                trial['timing_fidelity'] = timing_fidelity(trial['tools'])
+                if args.require_timing_fidelity and not trial['timing_fidelity']['passed']:
+                    raise RuntimeError('Tool timing fidelity failed; inspect duration overruns and launch/queue lags')
                 hit=trial['server_prefix_hit_rate']
-                print(f"Trial {index+1}: {len(replay.records)} requests, {len(replay.tools)} tools; whole {trial['windows']['whole']['seconds']:.2f}s; cached {f'{hit:.3f}' if hit is not None else 'N/A'}; host restore observed={trial['host_restore_observed']}",flush=True)
+                print(f"Trial {index+1}: {len(replay.records)} requests, {len(replay.tools)} tools; whole {trial['windows']['whole']['seconds']:.2f}s; cached {f'{hit:.3f}' if hit is not None else 'N/A'}; host restore observed={trial['host_restore_observed']}; timing={'PASS' if trial['timing_fidelity']['passed'] else 'WARN'}",flush=True)
             except BaseException as exc:
                 replay.cancel.set()
                 trial['error']=str(exc) or type(exc).__name__
@@ -406,10 +464,23 @@ def main():
             finally:
                 trial['activity_events']=[e for c in [client]+replay.clients for e in c.events if e['sent_ns']>=start]
                 persist()
+        if prepared is not None:
+            prepared.close()
+            data['tool_runtime_final'] = prepared.final()
+            prepared = None
     except BaseException as exc:
+        if prepared is not None:
+            try:
+                prepared.close(failed=True)
+            except BaseException as cleanup:
+                data['worker_cleanup_error'] = str(cleanup)
+            data['tool_runtime_final'] = prepared.final()
         data['error']=str(exc) or type(exc).__name__
         persist()
         raise
+    finally:
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
     persist()
     print(f'Saved {output}')
 
