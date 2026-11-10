@@ -16,22 +16,30 @@ The reference layout is one NVIDIA GPU, **16 physical CPU cores**, 64 GiB host
 RAM, four server cores and four STREAM workers with three cores each. Both CPU
 groups must be disjoint and on the GPU-local NUMA node. The workload uses about
 6 GiB for the four preallocated STREAM working sets, plus model/host KV memory.
-Keep an eight-hour allocation for the baseline and larger matrix; scheduling
-and retries can require more time. Each baseline configuration takes roughly
-13 minutes on the recorded Blackwell MIG setup, not a guaranteed runtime.
+Allow twelve hours for the baseline and larger matrix, including startup,
+validation and possible retries. Each baseline configuration takes roughly
+14 minutes on the recorded Blackwell MIG setup, not a guaranteed runtime.
 
 PACE ICE login terminal:
 
 ```bash
+tmux -L cs6222-policy new-session -s policy-hierarchy
 python3 scripts/skills/pace-setup/scripts/setup.py \
   --project "$PWD" --cpus 16 --gpu rtx_pro_6000_blackwell \
-  --partition ice-bw-gpu --memory 64G --time 08:00:00
+  --partition ice-bw-gpu --memory 64G --time 12:00:00
 ```
 
-From a Codex PTY, use a controlling terminal:
+Start `tmux` on the login node **before** allocating. Detach with Ctrl+B then D;
+reattach on that same login host with `tmux -L cs6222-policy attach -t
+policy-hierarchy`. This keeps the allocation-owning shell and driver alive when
+SSH or the chat disconnects. It does not extend Slurm's time limit or survive a
+login-host restart. Saving checkpoints alone cannot keep an allocation alive.
+
+When using a direct Codex PTY instead of tmux, a controlling terminal is needed,
+but that shell can be lost when the tool session closes:
 
 ```bash
-script -q -e -c 'python3 scripts/skills/pace-setup/scripts/setup.py --project "$PWD" --cpus 16 --gpu rtx_pro_6000_blackwell --partition ice-bw-gpu --memory 64G --time 08:00:00' /dev/null
+script -q -e -c 'python3 scripts/skills/pace-setup/scripts/setup.py --project "$PWD" --cpus 16 --gpu rtx_pro_6000_blackwell --partition ice-bw-gpu --memory 64G --time 12:00:00' /dev/null
 ```
 
 The helper checks current capacity, uses a bounded allocation wait, enters the
@@ -119,7 +127,9 @@ There are 27 eligible sessions in this deliberately filtered diagnostic subset.
 The controller caps the configured pending-token limit at half the actual GPU
 KV capacity. `status.json` records requested settings; the replay JSON's
 `controller_initial` records effective limits. Use those effective limits when
-interpreting forced flushes.
+interpreting forced flushes. These are flush thresholds, not hard instantaneous
+caps: a whole queued operation can transiently take pending tokens above them.
+The summary records the observed per-trial peak pending tokens.
 
 Use `python scripts/trace-replay/replay.py --controller-mode normal --plan
 scripts/results/policy-plans/baseline.json --dry-run` to inspect shapes/timing.
@@ -130,6 +140,17 @@ isolate physical DMA interference or recreate original prompt/tool execution.
 ## 4. Run all fifteen configurations and resume
 
 Inside the prepared compute shell:
+
+```bash
+export EXP_MODEL_REVISION=c1899de289a04d12100db370d81485cdf75e47ca
+bash scripts/trace-replay/run-studies.sh scripts/results/policy-plans "$EXP_RESULTS"
+```
+
+This runs/resumes both profiles sequentially and preserves `study-driver.log`.
+The optional revision export pins both server weights and replay tokenizer to
+the model revision found in the November 9 cache; it is part of resume and
+comparison compatibility checks. Omit it only for an explicitly separate study.
+For individual profiles, the equivalent commands are:
 
 ```bash
 python scripts/trace-replay/study.py run \
@@ -166,6 +187,8 @@ criteria on every retry and report failed-attempt counts.
 Each output contains `run-spec.json`, `progress.json`, `run.log`, immutable
 `attempts/` and an assembled `matrix/`. Every attempt records commands, source
 snapshots/diffs, placement, controller bounds, journals and raw replay JSON.
+`STUDY_LOG.md` records settings links, accepted counts, active configuration and
+last error in plain English whenever the checkpoint changes.
 Keep those directories on persistent storage. A stale `running` status after
 Slurm ends is not proof of completion; use the audit command.
 
@@ -199,6 +222,19 @@ with runtime, model-request latency, reuse, backup volume and STREAM bandwidth.
 SVGs are always saved; install `rsvg-convert` (librsvg) for PNG export. Missing
 partial cells are visibly N/A. Bars are trial medians and whiskers are min–max,
 not confidence intervals. A complete matrix produces figures automatically.
+
+To redraw an exported `summary.csv` (including a committed report) without the
+GPU or ignored raw files:
+
+```bash
+python scripts/trace-replay/plot_summary.py scripts/docs/policy-study/summary.csv \
+  --output-dir scripts/results/redrawn-summary
+```
+
+This checks aggregate row identities, sample counts and finite ordered
+statistics, then draws SVG/optional PNG charts, including replay time before
+counter settling. It also records the source CSV hash. This path does **not**
+revalidate raw trials; use the raw audit commands above for that.
 
 Draw the **design hierarchy** and queue illustration separately from measured
 result charts:

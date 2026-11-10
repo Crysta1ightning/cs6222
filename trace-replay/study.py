@@ -1,6 +1,7 @@
 """Prepare, resume, audit and assemble the fifteen-policy experiment matrix."""
 import argparse
 import copy
+import datetime as dt
 import fcntl
 import hashlib
 import json
@@ -116,6 +117,43 @@ def prepare_plans(source, output):
         policy_matrix.save(path, plan)
 
 
+def host_lock_path():
+    # Slurm TMPDIR differs per allocation; studies on this host must share
+    # the same per-user server lock.
+    return Path('/tmp')/f'policy-server-{os.getuid()}.lock'
+
+
+def save_progress(root, state):
+    """Keep a human-readable recovery notebook beside the machine checkpoint."""
+    policy_matrix.save(root/'progress.json', state)
+    spec=read(root/'run-spec.json')
+    done=set(state['completed'])
+    lines=['# Policy experiment notebook', '',
+        f'Updated {dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}.', '',
+        f'Status: **{state["status"]}**; {len(done)}/15 validated configurations; '
+        f'{len(done)*2*spec["trials"]} accepted measured trials. Warmups are excluded.', '',
+        f'Profile: {spec["profile"]}; allocation: {spec["job_id"]}; '
+        f'{spec["trials"]} waiting-tool and {spec["trials"]} STREAM trials per configuration.', '',
+        'Waiting tools preserve trace durations without memory stress. STREAM tools '
+        'replace tool work with synthetic memory traffic for the same durations. '
+        'The measurements use synthetic tokens rather than the original prompts.', '',
+        '[Exact settings, placement, plan/binary/source hashes](run-spec.json); '
+        '[commands and machine checkpoint](progress.json); [runner output](run.log). '
+        'Raw trials, server logs, source snapshots and failed attempts stay in attempts/.', '',
+        f'Active or most recently attempted configuration: {state.get("active", "none")}.', '',
+        '| Configuration | Accepted complete |', '|---|---|']
+    lines += [f'| {c["key"]} | {"Yes" if c["key"] in done else "No"} |'
+              for c in policy_matrix.configurations()]
+    lines += ['', 'A queued/running/stopped entry is not evidence of completion. '
+        'Resume with the identical command and --resume inside the same allocation. '
+        'A new allocation or changed sources/settings requires a new output directory; '
+        'do not pool configurations from different allocations.', '']
+    if state.get('error'):lines += [f'Last error: {state["error"]}', '']
+    temporary=root/'STUDY_LOG.tmp'
+    temporary.write_text('\n'.join(lines))
+    temporary.replace(root/'STUDY_LOG.md')
+
+
 def run(args):
     if not os.environ.get('SLURM_JOB_ID'):
         raise ValueError('Enter the prepared compute allocation before running')
@@ -123,7 +161,7 @@ def run(args):
     lock = (args.output_dir/'run.lock').open('w')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     # Separate studies must also avoid competing for the same server port.
-    host_lock = Path(tempfile.gettempdir())/f'policy-server-{os.getuid()}.lock'
+    host_lock = host_lock_path()
     resource_lock = host_lock.open('w')
     fcntl.flock(resource_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     binary = args.stream_worker.resolve()
@@ -136,6 +174,7 @@ def run(args):
     spec = dict(plan_sha256=digest(args.plan), binary_sha256=digest(binary),
         profile=args.profile, trials=args.trials, threads=args.threads, workers=args.workers,
         max_seconds=args.max_seconds, job_id=os.environ['SLURM_JOB_ID'],
+        model_revision=os.environ.get('EXP_MODEL_REVISION') or None,
         placement={k:os.environ.get(k) for k in ['EXP_SERVER_CPUS','EXP_TOOL_CPUS','EXP_NUMA_NODE','EXP_GPU_UUID','CUDA_VISIBLE_DEVICES']},
         sources={str(p.relative_to(HERE.parent)):digest(p) for p in list(HERE.glob('*.py')) +
                  [HERE.parent/'memory-experiment/launch-stream-aware.sh', HERE.parent/'memory-experiment/stream-worker.c',
@@ -171,7 +210,7 @@ def run(args):
                 '--gpu-cache-tokens',str(pool),'--reserve-tokens',str(reserve),
                 '--max-pending-tokens',str(pending),'--max-seconds',str(args.max_seconds)]
             state.update(active=key,heartbeat=time.time());state['commands'].append(command)
-            policy_matrix.save(args.output_dir/'progress.json',state)
+            save_progress(args.output_dir,state)
             env=dict(os.environ,EXP_CONTEXT_LENGTH=str(context),EXP_ATTENTION_BACKEND='triton',
                      EXP_SAMPLING_BACKEND='pytorch',EXP_RANDOM_SEED='6222')
             print(f'RUN {key}: {len(accepted)}/15 complete',flush=True)
@@ -183,7 +222,7 @@ def run(args):
             accepted[key]=(attempt/key).resolve()
             assemble(assembled,accepted,args.trials)
             state['completed']=list(accepted)
-            policy_matrix.save(args.output_dir/'progress.json',state)
+            save_progress(args.output_dir,state)
         state['status']='complete'
     except BaseException as exc:
         state.update(status='stopped',error=str(exc) or type(exc).__name__)
@@ -193,7 +232,7 @@ def run(args):
             except subprocess.TimeoutExpired:child.kill();child.wait()
         raise
     finally:
-        policy_matrix.save(args.output_dir/'progress.json',state)
+        save_progress(args.output_dir,state)
     subprocess.run([sys.executable,str(HERE/'matrix_summary.py'),str(assembled)],check=True)
 
 

@@ -166,6 +166,12 @@ class TraceTests(unittest.TestCase):
         self.assertNotEqual(compare.signature(a),compare.signature(b))
         b=copy.deepcopy(a);b['replay_config']['tool_runtime']='prepared'
         self.assertNotEqual(compare.signature(a),compare.signature(b))
+        b=copy.deepcopy(a);b['job_id']='another-allocation'
+        self.assertNotEqual(compare.signature(a),compare.signature(b))
+        b=copy.deepcopy(a);b['server_info']['revision']='another-model-revision'
+        self.assertNotEqual(compare.signature(a),compare.signature(b))
+        b=copy.deepcopy(a);b['replay_config']['model_revision']='another-tokenizer-revision'
+        self.assertNotEqual(compare.signature(a),compare.signature(b))
 
     def test_prefix_hit_does_not_claim_host_restore(self):
         trial=dict(requests=[dict(prompt_tokens=20,cached_tokens=10,output_tokens=2)],

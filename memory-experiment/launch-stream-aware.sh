@@ -44,6 +44,9 @@ unset OMP_PLACES
 export SGLANG_AUTO_NUMA_BIND=0
 export SGLANG_NUMA_BIND_V2=0
 backend_args=()
+if [[ -n "${EXP_MODEL_REVISION:-}" ]]; then
+  backend_args+=(--revision "$EXP_MODEL_REVISION")
+fi
 if [[ -n "${EXP_ATTENTION_BACKEND:-}" ]]; then
   backend_args+=(--attention-backend "$EXP_ATTENTION_BACKEND")
 fi

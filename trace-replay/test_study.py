@@ -1,6 +1,7 @@
 """Checkpoint acceptance, scaling and artifact compatibility checks."""
 import copy
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,6 +12,23 @@ import study
 
 
 class StudyTests(unittest.TestCase):
+    def test_server_lock_does_not_depend_on_allocation_tmpdir(self):
+        with patch.dict(os.environ, {'TMPDIR': '/different-allocation'}):
+            self.assertEqual(study.host_lock_path(), Path('/tmp')/f'policy-server-{os.getuid()}.lock')
+
+    def test_notebook_counts_only_accepted_configurations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            study.policy_matrix.save(root/'run-spec.json', dict(profile='baseline',job_id='test',trials=3))
+            state=dict(status='stopped',completed=['write_back--normal--all'],active='write_back--skip--all',error='timing failure')
+            study.save_progress(root,state)
+            self.assertEqual(study.read(root/'progress.json'),state)
+            text=(root/'STUDY_LOG.md').read_text()
+            self.assertIn('1/15',text)
+            self.assertIn('6 accepted measured trials',text)
+            self.assertIn('| write_back--skip--all | No |',text)
+            self.assertIn('timing failure',text)
+
     def test_checkpoint_requires_both_conditions_and_exact_trial_counts(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
@@ -73,6 +91,20 @@ class StudyTests(unittest.TestCase):
             self.stream_fixture(root,'normal','binary-one');self.stream_fixture(root,'skip','binary-two')
             with patch.object(matrix_summary.compare,'load'),patch.object(matrix_summary.compare,'signature',return_value={'server':{}}),patch.object(matrix_summary.compare,'metrics',return_value={'whole.seconds':1}):
                 with self.assertRaisesRegex(ValueError,'STREAM binary changed'):matrix_summary.load(root,partial=True)
+
+    def test_different_allocations_are_rejected_even_with_matching_placement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);study.policy_matrix.save(root/'status.json',dict(status='partial',trials=1))
+            for mode,job in [('normal','job-one'),('skip','job-two')]:
+                self.stream_fixture(root,mode,'same-binary')
+                path=next((root/f'write_through--{mode}--all'/'stream').glob('trace-*.json'))
+                data=study.read(path)
+                data.update(plan_sha256='same-plan',token_pool_sha256='same-pool',
+                    tool_workload='stream',server_info={},controller_initial={},job_id=job,
+                    hostname='same-host',cpu_affinity=[1,2])
+                study.policy_matrix.save(path,data)
+            with patch.object(matrix_summary.compare,'load'),patch.object(matrix_summary.compare,'metrics',return_value={'whole.seconds':1}):
+                with self.assertRaisesRegex(ValueError,'job_id'):matrix_summary.load(root,partial=True)
 
     def test_missing_stream_binary_is_not_assumed_compatible(self):
         with tempfile.TemporaryDirectory() as tmp:

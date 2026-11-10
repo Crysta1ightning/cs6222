@@ -19,10 +19,10 @@ def signature(data):
     return dict(plan_sha256=data['plan_sha256'],tool_workload=data['tool_workload'],
                 write_policy=data.get('write_policy','write_through'),queue_policy=data.get('queue_policy','all'),
                 pool=data['token_pool_sha256'],binary=data.get('stream_binary_sha256'),
-                replay={k:config.get(k) for k in ['threads','max_active_sessions','max_stream_processes','tail_requests','control_timeout','request_timeout','tool_timeout','drain_timeout','max_seconds','model','tool_runtime','require_timing_fidelity']},
-                hostname=data.get('hostname'),affinity=data.get('cpu_affinity'),
+                replay={k:config.get(k) for k in ['threads','max_active_sessions','max_stream_processes','tail_requests','control_timeout','request_timeout','tool_timeout','drain_timeout','max_seconds','model','model_revision','tool_runtime','require_timing_fidelity']},
+                hostname=data.get('hostname'),job_id=data.get('job_id'),affinity=data.get('cpu_affinity'),
                 numa=data.get('numa',{}).get('stdout'),
-                server={k:info.get(k) for k in ['model_path','context_length','max_total_tokens','mem_fraction_static','hicache_size','hicache_ratio','hicache_write_policy','disable_cuda_graph','dtype','page_size','tp_size','attention_backend','sampling_backend','random_seed']},
+                server={k:info.get(k) for k in ['model_path','revision','context_length','max_total_tokens','mem_fraction_static','hicache_size','hicache_ratio','hicache_write_policy','disable_cuda_graph','dtype','page_size','tp_size','attention_backend','sampling_backend','random_seed']},
                 bounds={k:data['controller_initial'].get(k) for k in ['max_pending_tokens','max_pending_ops','max_defer_seconds','lease_seconds','reserve_tokens','scheduler_placement']},
                 source_versions=data.get('source_versions'),runtime_source_sha256=data.get('runtime_source_sha256'))
 

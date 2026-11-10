@@ -299,6 +299,8 @@ def main():
                    help='Bounded scheduler acknowledgment wait; must be below the tool lease')
     p.add_argument('--url',default='http://127.0.0.1:30000')
     p.add_argument('--model',default='Qwen/Qwen3-0.6B')
+    p.add_argument('--model-revision',default=os.environ.get('EXP_MODEL_REVISION') or None,
+                   help='Pin both model and tokenizer to the same server revision')
     p.add_argument('--tool-workload',choices=['delay','stream'],default='delay')
     p.add_argument('--stream-binary',type=Path,default=SCRIPTS/'memory-experiment/stream-5')
     p.add_argument('--tool-runtime', choices=['prepared', 'subprocess'], default='prepared',
@@ -350,6 +352,8 @@ def main():
         raise RuntimeError('Require HiCache with the requested write policy and metrics')
     if settings.get('model_path') != args.model:
         raise RuntimeError('Server model_path differs from --model')
+    if args.model_revision and settings.get('revision') != args.model_revision:
+        raise RuntimeError('Server revision differs from --model-revision')
     limit=settings.get('context_length')
     if not isinstance(limit,int) or any(t['prefix_len']+t['input_len']+t['output_len']>limit for s in plan['sessions'] for t in s['steps']):
         raise RuntimeError('Cannot verify all rounds fit server context length')
@@ -363,7 +367,7 @@ def main():
     if client.initial['active_tool_ids'] or not client.initial.get('log_path'):
         raise RuntimeError('Use isolated controller with an event journal and no active tools')
     from transformers import AutoTokenizer
-    tokenizer=AutoTokenizer.from_pretrained(args.model,local_files_only=True)
+    tokenizer=AutoTokenizer.from_pretrained(args.model,revision=args.model_revision,local_files_only=True)
     pool=sorted(set(tokenizer.get_vocab().values())-set(tokenizer.all_special_ids))
     if len(pool)<256:
         raise RuntimeError('Tokenizer vocabulary unexpectedly small')
