@@ -1,0 +1,501 @@
+{
+  "schema": "tracelab-plan-v1",
+  "attribution": {
+    "title": "TraceLab: Characterizing Coding Agent Workloads for LLM Serving",
+    "authors": "Kan Zhu et al.; SyFI Lab, University of Washington",
+    "paper": "https://arxiv.org/abs/2606.30560",
+    "dataset": "https://github.com/uw-syfi/TraceLab",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "release": "v0.0.1",
+    "url": "https://github.com/uw-syfi/TraceLab/releases/download/v0.0.1/syfi_coding_trace.jsonl.gz"
+  },
+  "source_sha256": "9d265eae69a31cae203848bea936f018148eed7ca8bf56050c5abe96da0b4e6b",
+  "matches_pinned_release": true,
+  "source_rows": 357161,
+  "eligible_sessions": 27,
+  "rejected_sessions": {
+    "short_individual_tool_duration": 2810,
+    "context_overflow": 497,
+    "excess_parallel_tools": 58,
+    "too_short": 747,
+    "invalid_or_missing_fields": 42,
+    "no_tools_or_reuse": 81,
+    "nonconsecutive_or_duplicate_rounds": 3
+  },
+  "transforms": {
+    "seed": 6222,
+    "provider": "any",
+    "requested_sessions": 4,
+    "max_rounds": 4,
+    "min_rounds": 4,
+    "token_scale": 0.32,
+    "time_scale": 1,
+    "output_cap": 32,
+    "max_tool_seconds": 0,
+    "human_wait_cap": 5,
+    "max_context": 16384,
+    "session_spacing_seconds": 0,
+    "output_lengths": "held at baseline values: 8% scaling, cap 32"
+  },
+  "prefix_model": "reported cached-prefix length reconstructed with synthetic token IDs; not original token identity or guaranteed hits",
+  "timing_model": "closed-loop local generation; tool offsets relative to first emitted tool after full response; synthetic session arrivals",
+  "selection": {
+    "min_median_tool_seconds": 0,
+    "min_tool_seconds": 2,
+    "max_parallel_tools": 1,
+    "changes_workload_distribution": true
+  },
+  "sessions": [
+    {
+      "session_id": "claude:1ffde83e-7df4-c246-6c95-4914426547c4",
+      "provider": "claude",
+      "original_model": "claude-sonnet-4-6",
+      "steps": [
+        {
+          "round_index": 0,
+          "original": {
+            "input_tokens": 25718,
+            "prefix_tokens": 0,
+            "append_tokens": 25718,
+            "output_tokens": 302
+          },
+          "prefix_len": 0,
+          "input_len": 8230,
+          "output_len": 24,
+          "tools": [
+            {
+              "index": 0,
+              "name": "Agent",
+              "source_id": "call_4f4404611a4902d5",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 72.70899987220764,
+              "original_duration_seconds": 72.70899987220764,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1775316941.014,
+          "last_event_timestamp": 1775317020.409,
+          "first_input_event_type": "user_message",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 1,
+          "original": {
+            "input_tokens": 31534,
+            "prefix_tokens": 25715,
+            "append_tokens": 5819,
+            "output_tokens": 1868
+          },
+          "prefix_len": 8229,
+          "input_len": 1862,
+          "output_len": 32,
+          "tools": [
+            {
+              "index": 0,
+              "name": "Write",
+              "source_id": "call_368736a208b9d899",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 2.4200000762939453,
+              "original_duration_seconds": 2.4200000762939453,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1775317020.409,
+          "last_event_timestamp": 1775317055.392,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 2,
+          "original": {
+            "input_tokens": 33434,
+            "prefix_tokens": 31533,
+            "append_tokens": 1901,
+            "output_tokens": 89
+          },
+          "prefix_len": 10091,
+          "input_len": 608,
+          "output_len": 7,
+          "tools": [],
+          "first_input_timestamp": 1775317055.392,
+          "last_event_timestamp": 1775317058.804,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 5,
+          "original_human_wait_after_seconds": 71.11600017547607
+        },
+        {
+          "round_index": 3,
+          "original": {
+            "input_tokens": 33554,
+            "prefix_tokens": 33433,
+            "append_tokens": 121,
+            "output_tokens": 572
+          },
+          "prefix_len": 10699,
+          "input_len": 38,
+          "output_len": 32,
+          "tools": [],
+          "first_input_timestamp": 1775317129.92,
+          "last_event_timestamp": 1775317141.368,
+          "first_input_event_type": "user_message",
+          "human_wait_after_seconds": 0
+        }
+      ],
+      "arrival_seconds": 0
+    },
+    {
+      "session_id": "claude:83c03d7d-2292-63d1-5865-130bc0cca693",
+      "provider": "claude",
+      "original_model": "claude-opus-4-8",
+      "steps": [
+        {
+          "round_index": 0,
+          "original": {
+            "input_tokens": 13466,
+            "prefix_tokens": 8623,
+            "append_tokens": 4843,
+            "output_tokens": 136
+          },
+          "prefix_len": 2759,
+          "input_len": 1550,
+          "output_len": 11,
+          "tools": [
+            {
+              "index": 0,
+              "name": "Bash",
+              "source_id": "call_febe07c46077fb51",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 5.791000127792358,
+              "original_duration_seconds": 5.791000127792358,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1780290981.827,
+          "last_event_timestamp": 1780290989.97,
+          "first_input_event_type": "user_message",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 1,
+          "original": {
+            "input_tokens": 14571,
+            "prefix_tokens": 11687,
+            "append_tokens": 2884,
+            "output_tokens": 238
+          },
+          "prefix_len": 3740,
+          "input_len": 923,
+          "output_len": 19,
+          "tools": [
+            {
+              "index": 0,
+              "name": "Bash",
+              "source_id": "call_32dd6bb9fb2d8861",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 4.875999927520752,
+              "original_duration_seconds": 4.875999927520752,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1780290989.97,
+          "last_event_timestamp": 1780290998.674,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 2,
+          "original": {
+            "input_tokens": 15007,
+            "prefix_tokens": 14569,
+            "append_tokens": 438,
+            "output_tokens": 460
+          },
+          "prefix_len": 4662,
+          "input_len": 140,
+          "output_len": 32,
+          "tools": [
+            {
+              "index": 0,
+              "name": "Bash",
+              "source_id": "call_f6ebaa4b2c10f403",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 6.96399998664856,
+              "original_duration_seconds": 6.96399998664856,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1780290998.674,
+          "last_event_timestamp": 1780291012.089,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 3,
+          "original": {
+            "input_tokens": 15919,
+            "prefix_tokens": 15005,
+            "append_tokens": 914,
+            "output_tokens": 1028
+          },
+          "prefix_len": 4802,
+          "input_len": 292,
+          "output_len": 32,
+          "tools": [],
+          "first_input_timestamp": 1780291012.089,
+          "last_event_timestamp": 1780291027.45,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        }
+      ],
+      "arrival_seconds": 0
+    },
+    {
+      "session_id": "claude:cd704344-7ef5-79c1-011c-d6384bd7c67f",
+      "provider": "claude",
+      "original_model": "claude-opus-4-7",
+      "steps": [
+        {
+          "round_index": 0,
+          "original": {
+            "input_tokens": 35623,
+            "prefix_tokens": 0,
+            "append_tokens": 35623,
+            "output_tokens": 172
+          },
+          "prefix_len": 0,
+          "input_len": 11399,
+          "output_len": 14,
+          "tools": [
+            {
+              "index": 0,
+              "name": "WebSearch",
+              "source_id": "call_253a3f34146856ea",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 23.592000007629395,
+              "original_duration_seconds": 23.592000007629395,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1778870723.896,
+          "last_event_timestamp": 1778870766.086,
+          "first_input_event_type": "user_message",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 1,
+          "original": {
+            "input_tokens": 37715,
+            "prefix_tokens": 35617,
+            "append_tokens": 2098,
+            "output_tokens": 266
+          },
+          "prefix_len": 11397,
+          "input_len": 672,
+          "output_len": 21,
+          "tools": [
+            {
+              "index": 0,
+              "name": "WebFetch",
+              "source_id": "call_a9474f627777d33d",
+              "original_is_error": true,
+              "offset_seconds": 0.0,
+              "duration_seconds": 23.328999996185303,
+              "original_duration_seconds": 23.328999996185303,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1778870766.086,
+          "last_event_timestamp": 1778870794.723,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 2,
+          "original": {
+            "input_tokens": 38011,
+            "prefix_tokens": 37714,
+            "append_tokens": 297,
+            "output_tokens": 194
+          },
+          "prefix_len": 12068,
+          "input_len": 96,
+          "output_len": 16,
+          "tools": [
+            {
+              "index": 0,
+              "name": "WebFetch",
+              "source_id": "call_479acd278d538a2b",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 8.069999933242798,
+              "original_duration_seconds": 8.069999933242798,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1778870794.723,
+          "last_event_timestamp": 1778870806.6,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 3,
+          "original": {
+            "input_tokens": 38301,
+            "prefix_tokens": 38010,
+            "append_tokens": 291,
+            "output_tokens": 982
+          },
+          "prefix_len": 12163,
+          "input_len": 93,
+          "output_len": 32,
+          "tools": [],
+          "first_input_timestamp": 1778870806.6,
+          "last_event_timestamp": 1778870820.895,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        }
+      ],
+      "arrival_seconds": 0
+    },
+    {
+      "session_id": "claude:4372a151-7c4b-0a9e-4a2e-d73665931526",
+      "provider": "claude",
+      "original_model": "claude-opus-4-7",
+      "steps": [
+        {
+          "round_index": 0,
+          "original": {
+            "input_tokens": 25125,
+            "prefix_tokens": 17084,
+            "append_tokens": 8041,
+            "output_tokens": 186
+          },
+          "prefix_len": 5467,
+          "input_len": 2573,
+          "output_len": 15,
+          "tools": [
+            {
+              "index": 0,
+              "name": "Bash",
+              "source_id": "call_fbd42971506c0020",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 10.177000045776367,
+              "original_duration_seconds": 10.177000045776367,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1779597841.674,
+          "last_event_timestamp": 1779597855.629,
+          "first_input_event_type": "user_message",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 1,
+          "original": {
+            "input_tokens": 31352,
+            "prefix_tokens": 25119,
+            "append_tokens": 6233,
+            "output_tokens": 189
+          },
+          "prefix_len": 8038,
+          "input_len": 1995,
+          "output_len": 15,
+          "tools": [
+            {
+              "index": 0,
+              "name": "Bash",
+              "source_id": "call_4a27fa15afc0e68d",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 2.4179999828338623,
+              "original_duration_seconds": 2.4179999828338623,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1779597855.629,
+          "last_event_timestamp": 1779597862.446,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 2,
+          "original": {
+            "input_tokens": 31563,
+            "prefix_tokens": 31351,
+            "append_tokens": 212,
+            "output_tokens": 120
+          },
+          "prefix_len": 10032,
+          "input_len": 68,
+          "output_len": 10,
+          "tools": [
+            {
+              "index": 0,
+              "name": "Bash",
+              "source_id": "call_452825af0e21c764",
+              "original_is_error": true,
+              "offset_seconds": 0.0,
+              "duration_seconds": 10.272000074386597,
+              "original_duration_seconds": 10.272000074386597,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1779597862.446,
+          "last_event_timestamp": 1779597874.673,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        },
+        {
+          "round_index": 3,
+          "original": {
+            "input_tokens": 31813,
+            "prefix_tokens": 31562,
+            "append_tokens": 251,
+            "output_tokens": 199
+          },
+          "prefix_len": 10100,
+          "input_len": 80,
+          "output_len": 16,
+          "tools": [
+            {
+              "index": 0,
+              "name": "Bash",
+              "source_id": "call_d84133712acf0b97",
+              "original_is_error": false,
+              "offset_seconds": 0.0,
+              "duration_seconds": 3.3420000076293945,
+              "original_duration_seconds": 3.3420000076293945,
+              "duration_capped": false,
+              "timing_source": "timestamps"
+            }
+          ],
+          "first_input_timestamp": 1779597874.673,
+          "last_event_timestamp": 1779597881.157,
+          "first_input_event_type": "tool_result",
+          "human_wait_after_seconds": 0
+        }
+      ],
+      "arrival_seconds": 0
+    }
+  ],
+  "scale_intervention": "Same sessions, output lengths and all tool/user timings; 4x input/prefix token lengths; proportionally larger GPU pool/reserve/pending bounds; host cache fixed."
+}

@@ -1,0 +1,6 @@
+{
+  "source_csv": "../summary.csv",
+  "source_sha256": "3d545d9521e0707676d3f4dfa9cb0d8a27e23687285fa86dfd512f1f4851f715",
+  "validation": "Aggregate structure only. Use study.py audit or matrix_summary.py to validate raw trials.",
+  "uncertainty": "Medians with trial min-max whiskers; not confidence intervals. Missing cells are N/A."
+}

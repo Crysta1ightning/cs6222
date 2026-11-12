@@ -1,0 +1,34 @@
+{
+  "profile": "token4x",
+  "trials": 90,
+  "configs": 15,
+  "input_variations": [
+    [
+      "claude:83c03d7d-2292-63d1-5865-130bc0cca693",
+      "tail-0",
+      "post_tool_tail"
+    ]
+  ],
+  "output_variations": [
+    [
+      "claude:83c03d7d-2292-63d1-5865-130bc0cca693",
+      "3",
+      "trace"
+    ],
+    [
+      "claude:1ffde83e-7df4-c246-6c95-4914426547c4",
+      "1",
+      "trace"
+    ],
+    [
+      "claude:1ffde83e-7df4-c246-6c95-4914426547c4",
+      "2",
+      "trace"
+    ],
+    [
+      "claude:1ffde83e-7df4-c246-6c95-4914426547c4",
+      "tail-0",
+      "post_tool_tail"
+    ]
+  ]
+}

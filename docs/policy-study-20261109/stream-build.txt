@@ -1,0 +1,9 @@
+/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc -O3 -fopenmp -DSTREAM_ARRAY_SIZE=67108864 -DNTIMES=2 stream-worker.c -o stream-worker
+gcc (Spack GCC) 12.3.0
+Copyright (C) 2022 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+a52bae5e175bea3f7832112af9c085adab47117f7d2ce219165379849231692b  stream.c
+b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728  stream-worker.c
+75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15  stream-worker

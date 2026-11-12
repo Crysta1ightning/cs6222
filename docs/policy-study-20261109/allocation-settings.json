@@ -1,0 +1,337 @@
+{
+  "status": "ready",
+  "job_id": "6912917",
+  "hostname": "atl1-1-02-014-27-0.pace.gatech.edu",
+  "requested": {
+    "project": "/home/hice1/wchen784/cs6222",
+    "cpus": "16",
+    "server_cores": "4",
+    "gpu": "rtx_pro_6000_blackwell",
+    "memory": "64G",
+    "time": "12:00:00",
+    "partition": "ice-bw-gpu",
+    "numa_node": "None",
+    "allow_remote_numa": "False"
+  },
+  "slurm_step_id": "0",
+  "allowed_cpus": [
+    52,
+    53,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    78,
+    79,
+    82,
+    83
+  ],
+  "allowed_memory_nodes": [
+    0,
+    1
+  ],
+  "cpu_topology": [
+    {
+      "cpu": 52,
+      "node": 1,
+      "socket": 1,
+      "core": 4
+    },
+    {
+      "cpu": 53,
+      "node": 1,
+      "socket": 1,
+      "core": 5
+    },
+    {
+      "cpu": 66,
+      "node": 1,
+      "socket": 1,
+      "core": 18
+    },
+    {
+      "cpu": 67,
+      "node": 1,
+      "socket": 1,
+      "core": 19
+    },
+    {
+      "cpu": 68,
+      "node": 1,
+      "socket": 1,
+      "core": 20
+    },
+    {
+      "cpu": 69,
+      "node": 1,
+      "socket": 1,
+      "core": 21
+    },
+    {
+      "cpu": 70,
+      "node": 1,
+      "socket": 1,
+      "core": 22
+    },
+    {
+      "cpu": 71,
+      "node": 1,
+      "socket": 1,
+      "core": 23
+    },
+    {
+      "cpu": 72,
+      "node": 1,
+      "socket": 1,
+      "core": 64
+    },
+    {
+      "cpu": 73,
+      "node": 1,
+      "socket": 1,
+      "core": 65
+    },
+    {
+      "cpu": 74,
+      "node": 1,
+      "socket": 1,
+      "core": 66
+    },
+    {
+      "cpu": 75,
+      "node": 1,
+      "socket": 1,
+      "core": 67
+    },
+    {
+      "cpu": 78,
+      "node": 1,
+      "socket": 1,
+      "core": 70
+    },
+    {
+      "cpu": 79,
+      "node": 1,
+      "socket": 1,
+      "core": 71
+    },
+    {
+      "cpu": 82,
+      "node": 1,
+      "socket": 1,
+      "core": 74
+    },
+    {
+      "cpu": 83,
+      "node": 1,
+      "socket": 1,
+      "core": 75
+    }
+  ],
+  "lscpu": "CPU CORE SOCKET NODE\n  0    0      0    0\n  1    1      0    0\n  2    2      0    0\n  3    3      0    0\n  4    4      0    0\n  5    5      0    0\n  6    6      0    0\n  7    7      0    0\n  8    8      0    0\n  9    9      0    0\n 10   10      0    0\n 11   11      0    0\n 12   12      0    0\n 13   13      0    0\n 14   14      0    0\n 15   15      0    0\n 16   16      0    0\n 17   17      0    0\n 18   18      0    0\n 19   19      0    0\n 20   20      0    0\n 21   21      0    0\n 22   22      0    0\n 23   23      0    0\n 24   24      0    0\n 25   25      0    0\n 26   26      0    0\n 27   27      0    0\n 28   28      0    0\n 29   29      0    0\n 30   30      0    0\n 31   31      0    0\n 32   32      0    0\n 33   33      0    0\n 34   34      0    0\n 35   35      0    0\n 36   36      0    0\n 37   37      0    0\n 38   38      0    0\n 39   39      0    0\n 40   40      0    0\n 41   41      0    0\n 42   42      0    0\n 43   43      0    0\n 44   44      0    0\n 45   45      0    0\n 46   46      0    0\n 47   47      0    0\n 48   48      1    1\n 49   49      1    1\n 50   50      1    1\n 51   51      1    1\n 52   52      1    1\n 53   53      1    1\n 54   54      1    1\n 55   55      1    1\n 56   56      1    1\n 57   57      1    1\n 58   58      1    1\n 59   59      1    1\n 60   60      1    1\n 61   61      1    1\n 62   62      1    1\n 63   63      1    1\n 64   64      1    1\n 65   65      1    1\n 66   66      1    1\n 67   67      1    1\n 68   68      1    1\n 69   69      1    1\n 70   70      1    1\n 71   71      1    1\n 72   72      1    1\n 73   73      1    1\n 74   74      1    1\n 75   75      1    1\n 76   76      1    1\n 77   77      1    1\n 78   78      1    1\n 79   79      1    1\n 80   80      1    1\n 81   81      1    1\n 82   82      1    1\n 83   83      1    1\n 84   84      1    1\n 85   85      1    1\n 86   86      1    1\n 87   87      1    1\n 88   88      1    1\n 89   89      1    1\n 90   90      1    1\n 91   91      1    1\n 92   92      1    1\n 93   93      1    1\n 94   94      1    1\n 95   95      1    1",
+  "numa": "available: 2 nodes (0-1)\nnode 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47\nnode 0 size: 1031198 MB\nnode 0 free: 674451 MB\nnode 1 cpus: 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95\nnode 1 size: 1032173 MB\nnode 1 free: 829486 MB\nnode distances:\nnode     0    1 \n   0:   10   21 \n   1:   21   10",
+  "gpu_topology": "\u001b[4mGPU0\tNIC0\tNIC1\tCPU Affinity\tNUMA Affinity\tGPU NUMA ID\u001b[0m\nGPU0\t X \tNODE\tNODE\t52-53,66-75\t1\t\tN/A\nNIC0\tNODE\t X \tNODE\t\t\t\t\nNIC1\tNODE\tNODE\t X \t\t\t\t\n\nLegend:\n\n  X    = Self\n  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)\n  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node\n  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)\n  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)\n  PIX  = Connection traversing at most a single PCIe bridge\n  NV#  = Connection traversing a bonded set of # NVLinks\n\nNIC Legend:\n\n  NIC0: mlx5_0\n  NIC1: mlx5_1",
+  "gpu": {
+    "cuda_logical_index": 0,
+    "nvidia_index": 0,
+    "uuid": "GPU-9bd34407-31fa-8647-bc72-24ea067792c8",
+    "pci_bus_id": "00000000:B6:00.0",
+    "name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+    "memory_MiB": 97887.0,
+    "torch_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 2g.48gb",
+    "cuda_visible_devices": "MIG-2badea71-e30d-5d26-8ecd-0296c7bb9bbd"
+  },
+  "placement": {
+    "numa_node": 1,
+    "gpu_numa_node": 1,
+    "gpu_locality_verified": true,
+    "physical_core_capacity_by_node": {
+      "1": 16
+    },
+    "selected_cpus": [
+      52,
+      53,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      78,
+      79,
+      82,
+      83
+    ],
+    "server_cpus": [
+      52,
+      53,
+      66,
+      67
+    ],
+    "tool_cpus": [
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      78,
+      79,
+      82,
+      83
+    ],
+    "tool_threads": 12
+  },
+  "memory_probe": {
+    "cpu_affinity": [
+      52,
+      53,
+      66,
+      67
+    ],
+    "mapping": "155552453000 bind:1 file=/dev/zero\\040(deleted) dirty=8192 active=4 N1=8192 kernelpagesize_kB=4",
+    "resident_pages_by_node": {
+      "N1": 8192
+    },
+    "local_fraction": 1.0,
+    "scope": "32 MiB probe mapping, not future KV buffers"
+  },
+  "gpu_check": {
+    "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition MIG 2g.48gb",
+    "cuda_runtime": "13.0",
+    "versions": {
+      "sglang": "0.5.21",
+      "torch": "2.13.0+cu130",
+      "numpy": "2.3.5",
+      "requests": "2.34.2",
+      "psutil": "7.2.2",
+      "pytest": "9.1.1"
+    },
+    "computation": "PASS: 1024x1024 matrix multiply"
+  },
+  "sglang": {
+    "commit": "0c6af068abe77421063318e725283279d4778aa3",
+    "status": "",
+    "base_commit": "e00930c5489053f26d86b179cee0d087f846acbb"
+  },
+  "pip_check": "No broken requirements found.",
+  "exports": {
+    "EXP_JOB_ID": "6912917",
+    "EXP_HOSTNAME": "atl1-1-02-014-27-0.pace.gatech.edu",
+    "EXP_TOTAL_CPUS": "16",
+    "EXP_GPU_TYPE": "rtx_pro_6000_blackwell",
+    "EXP_GPU_UUID": "GPU-9bd34407-31fa-8647-bc72-24ea067792c8",
+    "EXP_SERVER_CPUS": "52,53,66,67",
+    "EXP_TOOL_CPUS": "68,69,70,71,72,73,74,75,78,79,82,83",
+    "EXP_NUMA_NODE": "1",
+    "EXP_THREADS": "12",
+    "EXP_RESULTS": "/home/hice1/wchen784/cs6222/scripts/results/pace-6912917-rtx_pro_6000_blackwell-numa1-t12",
+    "EXP_ENV_FILE": "/home/hice1/wchen784/cs6222/scripts/results/pace-setup/20261109-tmux-recovery/env.sh",
+    "EXP_SETUP_REPORT": "/home/hice1/wchen784/cs6222/scripts/results/pace-setup/20261109-tmux-recovery/settings.json",
+    "STREAM_CONTROL_ROOT": "/tmp/pace-3596650-6912917",
+    "STREAM_RESULT_ROOT": "/home/hice1/wchen784/cs6222/scripts/results/pace-6912917-rtx_pro_6000_blackwell-numa1-t12/controller",
+    "TRACE_RESULT_ROOT": "/home/hice1/wchen784/cs6222/scripts/results/pace-6912917-rtx_pro_6000_blackwell-numa1-t12/trace-delay",
+    "OMP_NUM_THREADS": "12",
+    "OMP_DYNAMIC": "FALSE",
+    "OMP_PROC_BIND": "close",
+    "OMP_PLACES": "cores"
+  },
+  "environment_file": "/home/hice1/wchen784/cs6222/scripts/results/pace-setup/20261109-tmux-recovery/env.sh",
+  "completed_utc": "2026-11-10T02:24:42.072916+00:00",
+  "server_started": false,
+  "experiments_started": false,
+  "slurm_job": {
+    "JobId": "6912917",
+    "JobName": "pace-setup",
+    "UserId": "wchen784(3596650)",
+    "GroupId": "gtperson(2626)",
+    "MCS_label": "N/A",
+    "Priority": "583333",
+    "Nice": "0",
+    "Account": "coc",
+    "QOS": "coc-ice",
+    "JobState": "RUNNING",
+    "Reason": "None",
+    "Dependency": "(null)",
+    "Requeue": "1",
+    "Restarts": "0",
+    "BatchFlag": "0",
+    "Reboot": "0",
+    "ExitCode": "0:0",
+    "RunTime": "00:00:28",
+    "TimeLimit": "12:00:00",
+    "TimeMin": "N/A",
+    "SubmitTime": "2026-11-09T20:52:05",
+    "EligibleTime": "2026-11-09T20:52:05",
+    "AccrueTime": "2026-11-09T20:52:06",
+    "StartTime": "2026-11-09T21:24:14",
+    "EndTime": "2026-11-10T09:24:14",
+    "Deadline": "N/A",
+    "PreemptEligibleTime": "2026-11-09T21:54:14",
+    "PreemptTime": "None",
+    "SuspendTime": "None",
+    "SecsPreSuspend": "0",
+    "LastSchedEval": "2026-11-09T21:24:14",
+    "Scheduler": "Backfill",
+    "Partition": "ice-bw-gpu",
+    "Sid": "login-ice-gnr-1.pace.gatech.edu:2554629",
+    "ReqNodeList": "(null)",
+    "ExcNodeList": "(null)",
+    "NodeList": "atl1-1-02-014-27-0",
+    "BatchHost": "atl1-1-02-014-27-0",
+    "NumNodes": "1",
+    "NumCPUs": "16",
+    "NumTasks": "1",
+    "CPUs/Task": "16",
+    "T": "0:0:*:1",
+    "ReqTRES": "cpu=16,mem=64G,node=1,billing=16,gres/gpu=1,gres/gpu:rtx_pro_6000_blackwell=1",
+    "AllocTRES": "cpu=16,mem=64G,node=1,billing=16,gres/gpu=1,gres/gpu:rtx_pro_6000_blackwell=1",
+    "Socks/Node": "*",
+    "C": "0:0:*:*",
+    "CoreSpec": "*",
+    "MinCPUsNode": "16",
+    "MinMemoryNode": "64G",
+    "MinTmpDiskNode": "0",
+    "Features": "(null)",
+    "DelayBoot": "00:00:00",
+    "OverSubscribe": "NO",
+    "Exclusive": "NO",
+    "Contiguous": "0",
+    "Licenses": "(null)",
+    "LicensesAlloc": "(null)",
+    "Network": "(null)",
+    "Command": "python3",
+    "SubmitLine": "salloc",
+    "name": "pace-setup",
+    "partition": "ice-bw-gpu",
+    "nodes": "1",
+    "ntasks": "1",
+    "task": "16",
+    "hint": "nomultithread",
+    "gres": "gpu:rtx_pro_6000_blackwell:1",
+    "flags": "enforce-binding",
+    "mem": "64G",
+    "time": "12:00:00",
+    "chdir": "/home/hice1/wchen784/cs6222",
+    "immediate": "3600",
+    "WorkDir": "/home/hice1/wchen784/cs6222",
+    "GresEnforceBind": "Yes",
+    "TresPerNode": "gres/gpu:rtx_pro_6000_blackwell:1",
+    "TresPerTask": "cpu=16"
+  },
+  "allocation_created_by_setup": true,
+  "virtualenv": "/home/hice1/wchen784/cs6222/.venv",
+  "second_terminal_command": "srun --jobid=6912917 --overlap --nodes=1 --ntasks=1 --cpus-per-task=16 --cpu-bind=cores --immediate=30 --kill-on-bad-exit=1 --pty bash --rcfile /home/hice1/wchen784/cs6222/scripts/results/pace-setup/20261109-tmux-recovery/session.bashrc -i"
+}

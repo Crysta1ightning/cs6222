@@ -1,0 +1,44 @@
+{
+  "profile": "baseline",
+  "trials": 90,
+  "configs": 15,
+  "input_variations": [
+    [
+      "claude:4372a151-7c4b-0a9e-4a2e-d73665931526",
+      "tail-0",
+      "post_tool_tail"
+    ]
+  ],
+  "output_variations": [
+    [
+      "claude:1ffde83e-7df4-c246-6c95-4914426547c4",
+      "0",
+      "trace"
+    ],
+    [
+      "claude:83c03d7d-2292-63d1-5865-130bc0cca693",
+      "1",
+      "trace"
+    ],
+    [
+      "claude:cd704344-7ef5-79c1-011c-d6384bd7c67f",
+      "1",
+      "trace"
+    ],
+    [
+      "claude:4372a151-7c4b-0a9e-4a2e-d73665931526",
+      "3",
+      "trace"
+    ],
+    [
+      "claude:1ffde83e-7df4-c246-6c95-4914426547c4",
+      "1",
+      "trace"
+    ],
+    [
+      "claude:4372a151-7c4b-0a9e-4a2e-d73665931526",
+      "tail-0",
+      "post_tool_tail"
+    ]
+  ]
+}

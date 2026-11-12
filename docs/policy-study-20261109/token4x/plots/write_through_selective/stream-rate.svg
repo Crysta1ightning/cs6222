@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="600"><rect width="100%" height="100%" fill="white"/><g font-family="Arial,sans-serif" fill="#172033">
+<text transform="translate(27 260) rotate(-90)" text-anchor="middle" font-size="22">Median per-tool STREAM Triad rate (GB/s)</text>
+<line x1="100" x2="1370" y1="460.0" y2="460.0" stroke="#e2e8f0"/>
+<text x="88" y="466.0" text-anchor="end" font-size="16">0.00</text>
+<line x1="100" x2="1370" y1="381.0" y2="381.0" stroke="#e2e8f0"/>
+<text x="88" y="387.0" text-anchor="end" font-size="16">9.63</text>
+<line x1="100" x2="1370" y1="302.0" y2="302.0" stroke="#e2e8f0"/>
+<text x="88" y="308.0" text-anchor="end" font-size="16">19.26</text>
+<line x1="100" x2="1370" y1="223.0" y2="223.0" stroke="#e2e8f0"/>
+<text x="88" y="229.0" text-anchor="end" font-size="16">28.89</text>
+<line x1="100" x2="1370" y1="144.0" y2="144.0" stroke="#e2e8f0"/>
+<text x="88" y="150.0" text-anchor="end" font-size="16">38.52</text>
+<line x1="100" x2="1370" y1="65.0" y2="65.0" stroke="#e2e8f0"/>
+<text x="88" y="71.0" text-anchor="end" font-size="16">48.15</text>
+<rect x="195.0" y="162.4146898983078" width="64" height="297.5853101016922" fill="#f59e0b"/>
+<path d="M227.0 162.8667801380442V152.0672735239064 M219.0 162.8667801380442H235.0 M219.0 152.0672735239064H235.0" stroke="#172033" stroke-width="2"/>
+<text x="227.0" y="142.0672735239064" text-anchor="middle" font-size="15">36.28</text>
+<text x="227.0" y="496" text-anchor="middle" font-size="18">Normal</text>
+<rect x="449.0" y="153.68841613426866" width="64" height="306.31158386573134" fill="#f59e0b"/>
+<path d="M481.0 154.825718030705V153.48913252901497 M473.0 154.825718030705H489.0 M473.0 153.48913252901497H489.0" stroke="#172033" stroke-width="2"/>
+<text x="481.0" y="143.48913252901497" text-anchor="middle" font-size="15">37.34</text>
+<text x="481.0" y="496" text-anchor="middle" font-size="18">Defer:</text>
+<text x="481.0" y="520" text-anchor="middle" font-size="18">all</text>
+<rect x="703.0" y="150.61798714589514" width="64" height="309.38201285410486" fill="#f59e0b"/>
+<path d="M735.0 155.11202869985277V137.11389505716517 M727.0 155.11202869985277H743.0 M727.0 137.11389505716517H743.0" stroke="#172033" stroke-width="2"/>
+<text x="735.0" y="127.11389505716517" text-anchor="middle" font-size="15">37.71</text>
+<text x="735.0" y="496" text-anchor="middle" font-size="18">Defer:</text>
+<text x="735.0" y="520" text-anchor="middle" font-size="18">victim</text>
+<rect x="957.0" y="131.69467808194844" width="64" height="328.30532191805156" fill="#f59e0b"/>
+<path d="M989.0 147.21126068989201V130.83333333333331 M981.0 147.21126068989201H997.0 M981.0 130.83333333333331H997.0" stroke="#172033" stroke-width="2"/>
+<text x="989.0" y="120.83333333333331" text-anchor="middle" font-size="15">40.02</text>
+<text x="989.0" y="496" text-anchor="middle" font-size="18">Defer:</text>
+<text x="989.0" y="520" text-anchor="middle" font-size="18">through victim</text>
+<rect x="1211.0" y="156.01339198991286" width="64" height="303.98660801008714" fill="#f59e0b"/>
+<path d="M1243.0 157.4591724799107V154.792093753862 M1235.0 157.4591724799107H1251.0 M1235.0 154.792093753862H1251.0" stroke="#172033" stroke-width="2"/>
+<text x="1243.0" y="144.792093753862" text-anchor="middle" font-size="15">37.06</text>
+<text x="1243.0" y="496" text-anchor="middle" font-size="18">Skip</text>
+<rect x="100" y="20" width="18" height="18" fill="#f59e0b"/>
+<text x="128" y="36" text-anchor="start" font-size="17">STREAM tools</text>
+<text x="1370" y="36" text-anchor="end" font-size="16">Bars: median; whiskers: trial min–max</text>
+</g></svg>

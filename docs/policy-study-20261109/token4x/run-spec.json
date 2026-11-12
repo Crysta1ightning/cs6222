@@ -1,0 +1,49 @@
+{
+  "plan_sha256": "9ff817ac0e9be504e1a09baadc923fe254650a0c15cd804e85eeb8dec0fb11dc",
+  "binary_sha256": "75cd98699cdc324523310964d54b97099fb222302d7238ea50fccb8c744d0b15",
+  "profile": "token4x",
+  "trials": 3,
+  "threads": 3,
+  "workers": 4,
+  "max_seconds": 1200,
+  "job_id": "6912917",
+  "model_revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+  "placement": {
+    "EXP_SERVER_CPUS": "52,53,66,67",
+    "EXP_TOOL_CPUS": "68,69,70,71,72,73,74,75,78,79,82,83",
+    "EXP_NUMA_NODE": "1",
+    "EXP_GPU_UUID": "GPU-9bd34407-31fa-8647-bc72-24ea067792c8",
+    "CUDA_VISIBLE_DEVICES": "MIG-2badea71-e30d-5d26-8ecd-0296c7bb9bbd"
+  },
+  "sources": {
+    "trace-replay/prepare.py": "9e702967d29b8a1762357bb0fc4589b4275ca73c1d482113e3c5997f391e1fa3",
+    "trace-replay/tool.py": "ec5c7815a5d24188ce56a753c1daa898030eee66d8cf88ef2e9a1dccec9d8563",
+    "trace-replay/compare.py": "c5ffd0adab1b37ed6a1c78a4ba6239ee2faf809e9d97a8adff6f0042dc781fd5",
+    "trace-replay/study.py": "211a87885a2df72d7ac5bcfd34beec1ff648467a7326f4c8556bee600190509b",
+    "trace-replay/test_trace_replay.py": "8de60d2ab7f401be3ca6b52c595454b258477dece211016f545b731f1cf850ed",
+    "trace-replay/prepared_tools.py": "b7d3475e790a34d8c95f8ba7dbff48c4ec952598e9a873ab3a0b7623c15a4bfb",
+    "trace-replay/timing.py": "c64a2108f05542fe8f87f502c5aa0d7ee8b58daf66025c2de3bd6c16630a3fda",
+    "trace-replay/test_prepared_tools.py": "277a7c915f1e94e013cb7c39e3f3ec1dbb5274700ade65a471ba24b183c93a59",
+    "trace-replay/contention_check.py": "6c3bb6b4391d8f1eaad1099378d760271e3b3cfbe8eac8eadf05ca5581a683d0",
+    "trace-replay/cpu_timing_check.py": "c8ddc4f07d6c2c55784755cf692b41b00b830ef9dd4a7b5f07150585eebb607c",
+    "trace-replay/cpu_scaling_check.py": "b20e6b94b0679c92fa64c9a87d6ceefbe98d245a42e17cbbcdc45733968548dd",
+    "trace-replay/explain.py": "b8c59a7ab15c3a1e74a7848cb69ea45adfaaaa00ffa3a19391b70b7641a91d58",
+    "trace-replay/policy_matrix.py": "b1c104c473e90cad92236ea91d44c417c9cb888e5c4a4ae4869f767e27f3cba2",
+    "trace-replay/matrix_summary.py": "039e79bb94355185df6263b8b72bac58404057d492d6dd2146077ca7d0a62fb8",
+    "trace-replay/replay.py": "06d9cda4f4701ce7a63c538f93f25ed71ae2011026d7e8a111820f9c10fe0ded",
+    "trace-replay/test_study.py": "84357555c9d983ccc8bea0c0bd9624268de02872d006860927460ded30199a95",
+    "trace-replay/plot_summary.py": "53b983e3f48433f185585836033ecbba02b7451fba06161fc5906bf7c48885f2",
+    "trace-replay/test_plot_summary.py": "26e641ecc5d282cadaa055c0e1eef159d9cf369a3e1f23e580e14ad23d6c0053",
+    "memory-experiment/launch-stream-aware.sh": "3ed602f68bcd18cef3a761a5a652c1ac1c0d77f4acbca5b3d2fabb9040074040",
+    "memory-experiment/stream-worker.c": "b34823b00378b5bf35aab1a7ac4547d832d6f18973d6b8486a75d34f2f550728",
+    "memory-experiment/activity.py": "730fd8b172114196dc56ad7376b90dba14498bac8eecce680bb9162e28214957",
+    "memory-experiment/run.py": "549d88bb98ce095e267de2ca865d1c71ebb97c8a1bf68421742d48ed3f222905",
+    "memory-experiment/compare.py": "2e7dbccfda0b26a27de2dca38e658d827334e9bb4d3fdc94b9a48cc0e8b07429",
+    "backup-policy/persistent_stream.py": "473e33c946166eea3b6283d6f41b75b84c055088fc1b18331c6f08dc5ff92b17"
+  },
+  "controller_sources": {
+    "/home/hice1/wchen784/cs6222/sglang/python/sglang/srt/managers/cache_controller.py": "4f7169001a8e3fda1cee04f9f4be7f2d40c4b127bce75da7ce850a38658eb80c",
+    "/home/hice1/wchen784/cs6222/sglang/python/sglang/srt/mem_cache/unified_radix_cache.py": "612997648b1c350317fd7fc7f06079e31aea45a45f6a9b824423ee031f841632",
+    "/home/hice1/wchen784/cs6222/sglang/python/sglang/srt/mem_cache/stream_activity.py": "3be7aaef3a2cb16924a422a5bdd900dbc0e7ef8f8db8c59515e1e0330504b815"
+  }
+}

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="600"><rect width="100%" height="100%" fill="white"/><g font-family="Arial,sans-serif" fill="#172033">
+<text transform="translate(27 260) rotate(-90)" text-anchor="middle" font-size="22">Median model request latency (s)</text>
+<line x1="100" x2="1370" y1="460.0" y2="460.0" stroke="#e2e8f0"/>
+<text x="88" y="466.0" text-anchor="end" font-size="16">0.00</text>
+<line x1="100" x2="1370" y1="381.0" y2="381.0" stroke="#e2e8f0"/>
+<text x="88" y="387.0" text-anchor="end" font-size="16">0.12</text>
+<line x1="100" x2="1370" y1="302.0" y2="302.0" stroke="#e2e8f0"/>
+<text x="88" y="308.0" text-anchor="end" font-size="16">0.23</text>
+<line x1="100" x2="1370" y1="223.0" y2="223.0" stroke="#e2e8f0"/>
+<text x="88" y="229.0" text-anchor="end" font-size="16">0.35</text>
+<line x1="100" x2="1370" y1="144.0" y2="144.0" stroke="#e2e8f0"/>
+<text x="88" y="150.0" text-anchor="end" font-size="16">0.47</text>
+<line x1="100" x2="1370" y1="65.0" y2="65.0" stroke="#e2e8f0"/>
+<text x="88" y="71.0" text-anchor="end" font-size="16">0.58</text>
+<rect x="155.0" y="166.06795563577066" width="64" height="293.93204436422934" fill="#60a5fa"/>
+<path d="M187.0 167.23692776324594V160.29276101441383 M179.0 167.23692776324594H195.0 M179.0 160.29276101441383H195.0" stroke="#172033" stroke-width="2"/>
+<text x="187.0" y="150.29276101441383" text-anchor="middle" font-size="15">0.43</text>
+<rect x="235.0" y="185.28638735669887" width="64" height="274.71361264330113" fill="#f59e0b"/>
+<path d="M267.0 186.83782623662574V173.72225156929994 M259.0 186.83782623662574H275.0 M259.0 173.72225156929994H275.0" stroke="#172033" stroke-width="2"/>
+<text x="267.0" y="163.72225156929994" text-anchor="middle" font-size="15">0.41</text>
+<text x="227.0" y="496" text-anchor="middle" font-size="18">Normal</text>
+<rect x="409.0" y="139.59796959422238" width="64" height="320.4020304057776" fill="#60a5fa"/>
+<path d="M441.0 155.93108112346965V130.83333333333331 M433.0 155.93108112346965H449.0 M433.0 130.83333333333331H449.0" stroke="#172033" stroke-width="2"/>
+<text x="441.0" y="120.83333333333331" text-anchor="middle" font-size="15">0.47</text>
+<rect x="489.0" y="189.41653462852173" width="64" height="270.58346537147827" fill="#f59e0b"/>
+<path d="M521.0 193.22677955431976V183.9293657294674 M513.0 193.22677955431976H529.0 M513.0 183.9293657294674H529.0" stroke="#172033" stroke-width="2"/>
+<text x="521.0" y="173.9293657294674" text-anchor="middle" font-size="15">0.40</text>
+<text x="481.0" y="496" text-anchor="middle" font-size="18">Defer:</text>
+<text x="481.0" y="520" text-anchor="middle" font-size="18">all</text>
+<rect x="663.0" y="136.96729056260068" width="64" height="323.0327094373993" fill="#60a5fa"/>
+<path d="M695.0 171.70366307068838V131.941780033346 M687.0 171.70366307068838H703.0 M687.0 131.941780033346H703.0" stroke="#172033" stroke-width="2"/>
+<text x="695.0" y="121.94178003334599" text-anchor="middle" font-size="15">0.48</text>
+<rect x="743.0" y="179.48522076754637" width="64" height="280.51477923245363" fill="#f59e0b"/>
+<path d="M775.0 191.12831628575975V170.532574218035 M767.0 191.12831628575975H783.0 M767.0 170.532574218035H783.0" stroke="#172033" stroke-width="2"/>
+<text x="775.0" y="160.532574218035" text-anchor="middle" font-size="15">0.41</text>
+<text x="735.0" y="496" text-anchor="middle" font-size="18">Defer:</text>
+<text x="735.0" y="520" text-anchor="middle" font-size="18">victim</text>
+<rect x="917.0" y="167.10588854800636" width="64" height="292.89411145199364" fill="#60a5fa"/>
+<path d="M949.0 168.8214253473721V137.71019214261412 M941.0 168.8214253473721H957.0 M941.0 137.71019214261412H957.0" stroke="#172033" stroke-width="2"/>
+<text x="949.0" y="127.71019214261412" text-anchor="middle" font-size="15">0.43</text>
+<rect x="997.0" y="191.7168088147119" width="64" height="268.2831911852881" fill="#f59e0b"/>
+<path d="M1029.0 194.32397874338113V186.35044468691473 M1021.0 194.32397874338113H1037.0 M1021.0 186.35044468691473H1037.0" stroke="#172033" stroke-width="2"/>
+<text x="1029.0" y="176.35044468691473" text-anchor="middle" font-size="15">0.40</text>
+<text x="989.0" y="496" text-anchor="middle" font-size="18">Defer:</text>
+<text x="989.0" y="520" text-anchor="middle" font-size="18">through victim</text>
+<rect x="1171.0" y="166.8223318808906" width="64" height="293.1776681191094" fill="#60a5fa"/>
+<path d="M1203.0 197.55461550430505V142.50883516360398 M1195.0 197.55461550430505H1211.0 M1195.0 142.50883516360398H1211.0" stroke="#172033" stroke-width="2"/>
+<text x="1203.0" y="132.50883516360398" text-anchor="middle" font-size="15">0.43</text>
+<rect x="1251.0" y="201.62543295022306" width="64" height="258.37456704977694" fill="#f59e0b"/>
+<path d="M1283.0 202.99101747783976V196.1671308823349 M1275.0 202.99101747783976H1291.0 M1275.0 196.1671308823349H1291.0" stroke="#172033" stroke-width="2"/>
+<text x="1283.0" y="186.1671308823349" text-anchor="middle" font-size="15">0.38</text>
+<text x="1243.0" y="496" text-anchor="middle" font-size="18">Skip</text>
+<rect x="100" y="20" width="18" height="18" fill="#60a5fa"/>
+<text x="128" y="36" text-anchor="start" font-size="17">Waiting tools</text>
+<rect x="290" y="20" width="18" height="18" fill="#f59e0b"/>
+<text x="318" y="36" text-anchor="start" font-size="17">STREAM tools</text>
+<text x="1370" y="36" text-anchor="end" font-size="16">Bars: median; whiskers: trial min–max</text>
+</g></svg>
