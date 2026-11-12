@@ -227,7 +227,7 @@ To redraw an exported `summary.csv` (including a committed report) without the
 GPU or ignored raw files:
 
 ```bash
-python scripts/trace-replay/plot_summary.py scripts/docs/policy-study/summary.csv \
+python scripts/trace-replay/plot_summary.py scripts/docs/policy-study-20261109/token4x/summary.csv \
   --output-dir scripts/results/redrawn-summary
 ```
 
@@ -235,6 +235,20 @@ This checks aggregate row identities, sample counts and finite ordered
 statistics, then draws SVG/optional PNG charts, including replay time before
 counter settling. It also records the source CSV hash. This path does **not**
 revalidate raw trials; use the raw audit commands above for that.
+
+STREAM tools run for the trace's prescribed time, completing whole memory-work
+blocks until the deadline. A slower worker can finish fewer blocks without
+making the replay much longer. `tool.stream_rounds_total` records completed
+blocks; `tool.stream_rounds_per_second` divides that total by the sum of actual
+STREAM worker durations (including final-block overrun). Delay tools and legacy
+artifacts without block counts show N/A. These metrics are derived from saved
+runs; they require no new GPU run. Per-tool Triad GB/s is a kernel rate, not total
+socket bandwidth. Inspect replay time before counter settling as well as total
+time. Neither measures completion time for a fixed amount of original tool work.
+
+The [completed baseline and 4× report](../docs/policy-study-20261109/README.md)
+contains all 180 accepted measurements, settings and source identities. The
+[November 5 report](../docs/policy-study/README.md) is a separate historical cohort.
 
 Draw the **design hierarchy** and queue illustration separately from measured
 result charts:

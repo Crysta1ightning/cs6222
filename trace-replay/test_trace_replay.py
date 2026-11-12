@@ -181,6 +181,19 @@ class TraceTests(unittest.TestCase):
         self.assertFalse(trial['host_restore_measurement_available'])
         self.assertFalse(trial['host_restore_observed'])
 
+    def test_stream_progress_weights_actual_worker_durations(self):
+        def tool(rounds,seconds):
+            return dict(result=dict(elapsed_seconds=seconds,stream_runs=[dict(rounds=rounds,
+                kernels=dict(Triad=dict(average_GB_per_second=30))) ]))
+        trial=dict(windows={},transfer_counter_deltas={},tools=[tool(100,1),tool(450,9),
+            dict(result=dict(elapsed_seconds=100,stream_runs=[]))])
+        values=compare.metrics(trial)
+        self.assertEqual(values['tool.stream_rounds_total'],550)
+        self.assertEqual(values['tool.stream_rounds_per_second'],55)
+        # Old subprocess artifacts lack block counts: preserve unknown as N/A.
+        del trial['tools'][0]['result']['stream_runs'][0]['rounds']
+        self.assertIsNone(compare.metrics(trial)['tool.stream_rounds_total'])
+
     def test_prepared_results_require_full_validation_and_cleanup(self):
         data = dict(schema='tracelab-replay-v1', trials=[{}], replay_config=dict(tool_runtime='prepared'))
         with tempfile.TemporaryDirectory() as tmp:

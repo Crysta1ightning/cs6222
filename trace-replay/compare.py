@@ -3,6 +3,7 @@ import argparse
 import csv
 import importlib.util
 import json
+import math
 from pathlib import Path
 import shutil
 import subprocess
@@ -70,6 +71,15 @@ def metrics(trial):
     stream_runs=[r for tool in trial.get('tools',[]) for r in tool.get('result',{}).get('stream_runs',[])]
     result['tool.stream_invocations']=len(stream_runs) if stream_runs else None
     result['tool.stream_median_triad_GB_per_second']=charts.stats([r['kernels']['Triad']['average_GB_per_second'] for r in stream_runs])[0]
+    # Timed tools finish fewer blocks when memory traffic slows them down.
+    # Normalize by summed worker durations, including the last whole block.
+    rounds=[r.get('rounds') for r in stream_runs]
+    elapsed=[t.get('result',{}).get('elapsed_seconds') for t in trial.get('tools',[])
+             if t.get('result',{}).get('stream_runs')]
+    valid_rounds=rounds and all(type(n) is int and n>0 for n in rounds)
+    valid_elapsed=elapsed and all(isinstance(s,(int,float)) and math.isfinite(s) and s>0 for s in elapsed)
+    result['tool.stream_rounds_total']=sum(rounds) if valid_rounds else None
+    result['tool.stream_rounds_per_second']=sum(rounds)/sum(elapsed) if valid_rounds and valid_elapsed else None
     result['tool.surrogate_queue_seconds_total']=sum(t.get('surrogate_queue_seconds',0) for t in trial.get('tools',[]))
     result['tool.duration_overrun_seconds_total']=sum(t.get('duration_overrun_seconds',0) for t in trial.get('tools',[]))
     for key in ['excessive_duration_overruns', 'excessive_start_lags', 'max_overrun_seconds', 'passed']:

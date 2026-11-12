@@ -18,7 +18,9 @@ METRICS=[('whole.seconds','Replay + drain + counter settling (s)','runtime',Fals
          ('whole.server_prefix_hit_rate','Fraction of input tokens reused','reuse',False),
          ('whole.backup_GB','GPU-to-host payload (GB)','backups',False),
          ('whole.restore_GB','Host-to-GPU payload (GB)','restores',False),
-         ('tool.stream_median_triad_GB_per_second','Median per-tool STREAM Triad rate (GB/s)','stream-rate',True)]
+         ('tool.stream_median_triad_GB_per_second','Median per-tool STREAM Triad rate (GB/s)','stream-rate',True),
+         ('tool.stream_rounds_total','Completed STREAM blocks in timed tools','stream-work',True),
+         ('tool.stream_rounds_per_second','STREAM blocks / summed worker seconds','stream-progress',True)]
 
 
 def number(value):
