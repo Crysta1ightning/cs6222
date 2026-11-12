@@ -1,0 +1,9 @@
+# Core versions recorded in the validated November 9–10 study.
+# Install patched SGLang from source first; do not replace it with a wheel.
+numpy==2.3.5
+psutil==7.2.2
+requests==2.34.2
+tokenizers==0.22.2
+torch==2.13.0+cu130
+transformers==5.12.1
+triton==3.7.1

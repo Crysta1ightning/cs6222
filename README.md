@@ -3,6 +3,8 @@
 Compare all **15** meaningful combinations of three base write policies and
 normal, skip, defer/all, defer/victim, or defer/through-victim control.
 
+- [Experiment command entry point](trace-replay/experiments.py): `prepare`, `run`,
+  `report`, `plot`, `hierarchy`, `check-environment`, and `verify-reference`.
 - [Reproduction manual](trace-replay/REPRODUCE.md): allocate resources, install
   the controller patch, prepare workloads, run/resume, audit and draw figures.
 - [Policy definitions and measurement limits](trace-replay/POLICY_MATRIX.md).

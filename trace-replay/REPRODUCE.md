@@ -10,6 +10,87 @@ git clone --branch experiment/policy-hierarchy-reproduction https://github.com/C
 cd ~/cs6222
 ```
 
+## Quick start and reproducibility contract
+
+Use [experiments.py](experiments.py) as the common entry point. It resolves code
+paths relative to its own location; the commands below assume the workspace
+layout shown above. `python experiments.py --help` and each subcommand's
+`--help` list the required arguments. CPU-only inspection and drawing do not
+require a GPU allocation.
+
+```bash
+# CPU only: verify the published plans, summaries and frozen measured Git sources.
+python scripts/trace-replay/experiments.py verify-reference
+
+# After the allocation/setup/build steps in sections 1–2:
+python scripts/trace-replay/experiments.py check-environment
+python scripts/trace-replay/experiments.py prepare \
+  --plans scripts/results/policy-plans
+
+# Run both complete matrices. Repeating this command resumes compatible work.
+python scripts/trace-replay/experiments.py run \
+  --plans scripts/results/policy-plans --output "$EXP_RESULTS"
+
+# CPU only, once BOTH profiles are complete: strict raw audit + tables + all plots.
+python scripts/trace-replay/experiments.py report --output "$EXP_RESULTS"
+
+# CPU only: redraw published results without access to the raw PACE files.
+python scripts/trace-replay/experiments.py plot \
+  --csv scripts/docs/policy-study-20261109/token4x/summary.csv \
+  --output scripts/results/reference-plots
+
+# Draw the conceptual policy hierarchy, rather than measurement bars.
+python scripts/trace-replay/experiments.py hierarchy \
+  --output scripts/results/policy-hierarchy
+```
+
+The `run` command pins model/tokenizer revision automatically, requires plans
+identical to the published baseline/token4x plans, and checks Python plus eight
+core package versions before starting either matrix. It delegates allocation,
+placement and resume checks to the existing runner. To study different software
+or workloads, invoke `study.py` explicitly in a fresh output directory and record
+the change; it is a separate experiment.
+
+The `report` command only publishes a complete `REPORT.md` after both raw audits
+pass, requiring three trials per cell. If it fails, that file says validation is
+in progress or failed; do not use stale tables as evidence of completion. This
+command changes only analysis outputs, never raw trials. `plot` validates CSV
+structure and draws figures; it cannot certify raw measurements. `verify-reference`
+checks committed plan/CSV hashes, plot input hashes, all 30 cells/profile and
+frozen measured Git source hashes. It needs the measurement commit in Git
+history (use a full clone, or fetch that commit if your clone is shallow).
+
+**Reproducibility means a pinned, inspectable procedure and validated repeated
+measurements, not guaranteed identical performance numbers or output text.**
+Shared-node load, CPU frequency, GPU/MIG topology, drivers and kernel scheduling
+can change timings. Seeded GPU inference is not guaranteed bit-identical; even
+the reference data have some varying generated outputs and generated-history
+tails. Preserve that limitation when interpreting request/cache comparisons.
+
+There are three distinct checks:
+
+1. **Artifact identity:** source/model/dataset/plan/worker hashes, package versions
+   and settings must be recorded and checked. The reference driver checks core
+   versions; [all recorded package versions](../docs/policy-study-20261109/python-packages.txt)
+   support a fuller environment comparison. This reference list is not a tested
+   cross-platform dependency lockfile; do not blindly install it over the setup
+   environment. The driver does not certify the full dependency closure or driver.
+2. **Execution validity:** every cell must pass raw timing, shape, counter,
+   placement, drain, worker-validation and cleanup checks. All 15 cells/profile
+   must have three delay and three STREAM trials. Preserve failed attempts and
+   warmups, but exclude them from measured summaries. Never merge allocations.
+3. **Numerical repeatability:** use independent complete reruns on comparable
+   hardware to assess whether effect directions and sizes persist. Compare
+   distributions/ranges, not equality to a reference rounded number. These
+   three-repeat studies do not supply a statistical significance guarantee.
+
+For historical execution, the exact frozen scripts commit is
+`120832cc1436f2ff2d6965ee2fb19644600078cd`; newer analysis adds STREAM work metrics.
+To replay that implementation in a separate workspace, clone/check out that
+commit there and follow its manual. Keep the current checkout for `experiments.py`
+and post-run analysis. New runs from the current checkout record the current
+source hashes and must remain separate from the historical allocation.
+
 ## 1. Allocate and verify resources
 
 The reference layout is one NVIDIA GPU, **16 physical CPU cores**, 64 GiB host
@@ -64,6 +145,14 @@ For an existing checkout, inspect changes first, then run:
 ```bash
 bash scripts/memory-experiment/sglang-patches/apply.sh "$PWD/sglang"
 bash scripts/memory-experiment/build-worker.sh
+
+# The setup helper pins Torch/SGLang but may resolve newer auxiliary packages.
+# In the activated reference venv, pin the measured core package versions:
+python -m pip install --no-cache-dir \
+  -r scripts/trace-replay/reference-core-requirements.txt \
+  --extra-index-url https://download.pytorch.org/whl/cu130
+python -m pip check
+python scripts/trace-replay/experiments.py check-environment
 ```
 
 `apply.sh` verifies the patch checksum and recorded base, is idempotent, and
@@ -147,9 +236,9 @@ bash scripts/trace-replay/run-studies.sh scripts/results/policy-plans "$EXP_RESU
 ```
 
 This runs/resumes both profiles sequentially and preserves `study-driver.log`.
-The optional revision export pins both server weights and replay tokenizer to
+The revision export pins both server weights and replay tokenizer to
 the model revision found in the November 9 cache; it is part of resume and
-comparison compatibility checks. Omit it only for an explicitly separate study.
+comparison compatibility checks. The entry point sets it automatically. Omit it only for an explicitly separate study.
 For individual profiles, the equivalent commands are:
 
 ```bash
@@ -275,3 +364,43 @@ python -m unittest discover -s scripts/memory-experiment -p 'test_queue_selectio
 
 Local UNIX sockets must be permitted; a socket-blocking sandbox cannot execute
 the protocol tests. A test pass validates the harness, not GPU performance.
+
+## 7. Read the outputs and interpret comparisons
+
+| Output / metric | Meaning and interpretation |
+|---|---|
+| `REPORT.md` | Both-profile completion marker from `experiments.py report`; use only after command exit 0. |
+| `PROFILE/run-spec.json`, `progress.json`, `STUDY_LOG.md` | Settings, hashes, exact commands, resume state, accepted and failed attempts. |
+| `PROFILE/attempts/` | Preserve all raw JSON, server/controller logs and source snapshots. Assembled `matrix/` contains links into these attempts, so archiving only `matrix/` is insufficient. |
+| `PROFILE/matrix/validation.json` | One acceptance record per measured trial: 90/profile. |
+| `summary.csv` | Rows contain configuration, tool condition, metric, n, median, min, max. Missing data are N/A, not zero. |
+| `whole.seconds` / `whole.execution_seconds` | Total replay including accounting settle / replay before settle. Long fixed tool waits can hide request-level changes. |
+| `whole.latency_median_seconds` | Median model-request time within each trial, then median across trials; not a pooled-request median or tail percentile. |
+| `whole.server_prefix_hit_rate` | Fraction of input tokens reused, not fraction of requests that hit. Lower reuse with lower copying may mean recomputation. |
+| `whole.backup_GB` / `whole.restore_GB` | GPU-to-host / host-to-GPU logical payload in decimal GB; not PCIe utilization or measured DMA overlap. |
+| `tool.stream_rounds_total` / `tool.stream_rounds_per_second` | Completed blocks / blocks per summed actual worker-second. Inspect these for timed tools even when replay times are similar. |
+| `tool.stream_median_triad_GB_per_second` | Median per-tool kernel rate, not completed tool work or aggregate socket throughput. |
+| Controller decisions, overrides, partial selections and peak pending tokens | Establish whether a strategy acted, or its pressure/age safeguards took over. Repeated polls are not unique cache entries. |
+
+Compare against `normal/all` within the **same base policy, workload scale and
+tool condition**. Percentage change is `100 × (candidate median / normal median − 1)`.
+Negative time/latency/copy changes mean lower values; positive completed-work
+rate changes mean more progress. Inspect absolute values and min/max ranges as
+well as percentages. Do not interpret every decrease as a benefit: fewer
+restores/backups can mean reusable cache was lost.
+
+Use write-back's controller variants as negative controls: they have no optional
+eager-copy queue here. If transfer counts are identical but timings differ,
+shared-system variation is a plausible explanation. For defer policies check
+whether deferred decisions and partial selections are nonzero before attributing
+a speed change to deferral. The scale-up also changes prefill/admission/cache
+pressure, so it does not isolate DMA contention. The reference report discusses
+these cases in plain English with the actual measured values.
+
+For durable recovery/archival, preserve both profile directories (including
+`attempts/`), plans, setup `settings.json`/`env.sh`, compiler metadata, the full
+Git source history and package versions on persistent storage. Preserve symlinks
+and their targets together, or dereference links in an archive. Authentication
+files and model/download caches are not result artifacts. Published aggregate
+CSVs and their hashes allow independent redraw; raw trials are required for an
+independent acceptance audit.
